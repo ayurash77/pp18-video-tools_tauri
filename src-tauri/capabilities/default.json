@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "Default permissions for PP18 Video Tools",
   "windows": ["main", "logs"],
-  "permissions": ["core:default", "core:webview:allow-create-webview-window", "dialog:default"]
+  "permissions": [
+    "core:default",
+    "core:webview:allow-create-webview-window",
+    "dialog:default",
+    "process:default",
+    "updater:default"
+  ]
 }

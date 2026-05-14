@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { open } from "@tauri-apps/plugin-dialog";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check } from "@tauri-apps/plugin-updater";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -349,6 +351,9 @@ function App() {
 
   useEffect(() => {
     void loadTelegramSettings();
+    if (import.meta.env.PROD) {
+      void checkForAppUpdate();
+    }
   }, []);
 
   useEffect(() => {
@@ -416,6 +421,24 @@ function App() {
       setTelegramDraft({ botToken: settings.botToken, chatId: settings.chatId });
     } catch (error) {
       appendLog(`Не удалось загрузить настройки Telegram: ${String(error)}`);
+    }
+  }
+
+  async function checkForAppUpdate() {
+    try {
+      appendLog("Проверка обновлений...");
+      const update = await check();
+      if (!update) {
+        appendLog("Обновлений нет.");
+        return;
+      }
+
+      appendLog(`Найдено обновление ${update.version}. Установка...`);
+      await update.downloadAndInstall();
+      appendLog("Обновление установлено. Перезапуск...");
+      await relaunch();
+    } catch (error) {
+      appendLog(`Не удалось проверить или установить обновление: ${String(error)}`);
     }
   }
 

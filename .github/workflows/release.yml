@@ -1,0 +1,91 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+            rust-targets: ""
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+            rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+            rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.rust-targets == ''
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.rust-targets != ''
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install FFmpeg binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force src-tauri/bin | Out-Null
+          $zip = "$env:RUNNER_TEMP\ffmpeg.zip"
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath "$env:RUNNER_TEMP\ffmpeg" -Force
+          $root = Get-ChildItem "$env:RUNNER_TEMP\ffmpeg" -Directory | Select-Object -First 1
+          Copy-Item "$($root.FullName)\bin\ffmpeg.exe" "src-tauri/bin/ffmpeg.exe"
+          Copy-Item "$($root.FullName)\bin\ffprobe.exe" "src-tauri/bin/ffprobe.exe"
+
+      - name: Install FFmpeg binaries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p src-tauri/bin
+          curl -L "https://evermeet.cx/ffmpeg/getrelease/zip" -o "$RUNNER_TEMP/ffmpeg.zip"
+          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o "$RUNNER_TEMP/ffprobe.zip"
+          ditto -x -k "$RUNNER_TEMP/ffmpeg.zip" "$RUNNER_TEMP/ffmpeg"
+          ditto -x -k "$RUNNER_TEMP/ffprobe.zip" "$RUNNER_TEMP/ffprobe"
+          cp "$RUNNER_TEMP/ffmpeg/ffmpeg" src-tauri/bin/ffmpeg
+          cp "$RUNNER_TEMP/ffprobe/ffprobe" src-tauri/bin/ffprobe
+          chmod +x src-tauri/bin/ffmpeg src-tauri/bin/ffprobe
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "PP18 Video Tools v__VERSION__"
+          releaseBody: "See the assets to download and install this version."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}

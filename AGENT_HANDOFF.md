@@ -65,6 +65,7 @@ Implemented in the Tauri version:
 - Progress/log/status event streaming through Tauri event `workflow-event`.
 - Show in folder through Rust command `reveal_in_folder`.
 - Open in system player through Rust command `open_in_system_player`.
+- Auto-update support through Tauri updater, GitHub Releases, and `.github/workflows/release.yml`.
 - Shotmate-inspired UI tokens, local fonts, and local components in `src/components/ui`.
 - Binary sync script:
 
@@ -215,8 +216,28 @@ ffmpeg.exe
 ffprobe.exe
 ```
 
+These files are ignored locally and are not stored in Git. The release workflow
+downloads platform binaries into `src-tauri/bin` before running the Tauri build.
 HandBrakeCLI is not used by the Tauri workflow; both fixes and preview encoding use `ffmpeg`.
-A later cleanup should package only platform-specific binaries per target.
+
+## Release and Updates
+
+The updater public key is configured in `src-tauri/tauri.conf.json`.
+The private signing key was generated locally at:
+
+```text
+~/.tauri/pp18-video-tools.key
+```
+
+Add the private key content to GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`.
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` can be empty for the current generated key.
+
+Release workflow trigger:
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
 
 ## Suggested Next Steps
 

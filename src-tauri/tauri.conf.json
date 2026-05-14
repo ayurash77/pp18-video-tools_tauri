@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,6 +36,17 @@
     ],
     "resources": {
       "bin/*": "bin/"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEExMjkxRkIxQkM0RUU1OTIKUldTUzVVNjhzUjhwb1lrRXZqdmt3K0tKWXJKbm11MWhFMkRwN3NyVGp2TkwzeGM5Tmx3S3ZnVTQK",
+      "endpoints": [
+        "https://github.com/ayurash77/pp18-video-tools_tauri/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
