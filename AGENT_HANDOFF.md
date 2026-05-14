@@ -230,7 +230,8 @@ The private signing key was generated locally at:
 ```
 
 Add the private key content to GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`.
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` can be empty for the current generated key.
+The current generated key has no password, so the release workflow does not pass
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
 Release workflow trigger:
 

@@ -73,10 +73,8 @@ Before running the release workflow, add these GitHub Actions secrets:
 
 ```text
 TAURI_SIGNING_PRIVATE_KEY
-TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 ```
 
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` can be empty if the generated key has no password.
 The current private key was generated locally at:
 
 ```text
