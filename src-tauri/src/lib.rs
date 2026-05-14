@@ -154,7 +154,7 @@ impl WorkflowControl {
 
 #[tauri::command]
 fn tool_status(app: AppHandle) -> Vec<ToolInfo> {
-    ["ffmpeg", "ffprobe", "HandBrakeCLI"]
+    ["ffmpeg", "ffprobe"]
         .iter()
         .map(|name| {
             let path = find_tool(&app, name);

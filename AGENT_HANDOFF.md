@@ -54,7 +54,7 @@ Implemented in the Tauri version:
 - Native video file selection through `@tauri-apps/plugin-dialog`.
 - Table with `Fixes`, `Preview`, and `TG` row actions.
 - `ffprobe` metadata loading through Rust command `probe_video`.
-- Tool status check through Rust command `tool_status`.
+- Tool status check for `ffmpeg` / `ffprobe` through Rust command `tool_status`.
 - Existing-output checks through Rust command `path_existence`.
 - `Fixes` processing pipeline through Rust command `run_actions` and `ffmpeg`.
 - `Preview` creation through Rust command `run_actions` and `ffmpeg`.
@@ -112,8 +112,6 @@ Use the Qt project as the source of truth for behavior:
 ../pp18-video-tools_qt/src/MainWindow.h
 ../pp18-video-tools_qt/src/services/FfmpegBatchService.cpp
 ../pp18-video-tools_qt/src/services/FfmpegBatchService.h
-../pp18-video-tools_qt/src/services/HandbrakePreviewService.cpp
-../pp18-video-tools_qt/src/services/HandbrakePreviewService.h
 ../pp18-video-tools_qt/src/services/TelegramController.cpp
 ../pp18-video-tools_qt/src/services/TelegramService.cpp
 ```
@@ -213,13 +211,12 @@ Current copied files:
 ```text
 ffmpeg
 ffprobe
-HandBrakeCLI
 ffmpeg.exe
 ffprobe.exe
-HandBrakeCLI.exe
 ```
 
-The macOS release app currently includes all of them as resources. A later cleanup should package only platform-specific binaries per target.
+HandBrakeCLI is not used by the Tauri workflow; both fixes and preview encoding use `ffmpeg`.
+A later cleanup should package only platform-specific binaries per target.
 
 ## Suggested Next Steps
 

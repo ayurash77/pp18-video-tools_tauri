@@ -47,7 +47,7 @@ The app also falls back to those sibling folders in development.
 - Video table with `Fixes`, `Preview`, `TG` actions.
 - `ffprobe` metadata loading through Rust command.
 - Show in folder / open in system player.
-- Tool status check for `ffmpeg`, `ffprobe`, `HandBrakeCLI`.
+- Tool status check for `ffmpeg` and `ffprobe`.
 - Tailwind v4 + local shadcn-like UI components inspired by Shotmate.
 - `Fixes` and `Preview` ffmpeg workflows with progress/log events.
 - Telegram settings and `sendVideo` upload of preview files.

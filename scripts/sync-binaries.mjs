@@ -7,7 +7,7 @@ const sourceDirs = [
   resolve(projectRoot, "..", "pp18-video-tools_qt", "bin"),
   resolve(projectRoot, "..", "pp18-video-tools_cli", "bin"),
 ];
-const names = ["ffmpeg", "ffprobe", "HandBrakeCLI", "ffmpeg.exe", "ffprobe.exe", "HandBrakeCLI.exe"];
+const names = ["ffmpeg", "ffprobe", "ffmpeg.exe", "ffprobe.exe"];
 
 mkdirSync(targetBin, { recursive: true });
 
