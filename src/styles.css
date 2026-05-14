@@ -1,0 +1,595 @@
+@import "tailwindcss";
+
+@font-face {
+  font-display: swap;
+  font-family: "Titillium";
+  font-style: normal;
+  font-weight: 400;
+  src: url("./assets/fonts/Titillium/Titillium_regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Titillium";
+  font-style: normal;
+  font-weight: 600;
+  src: url("./assets/fonts/Titillium/Titillium_semibold.ttf") format("truetype");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Titillium";
+  font-style: normal;
+  font-weight: 700;
+  src: url("./assets/fonts/Titillium/Titillium_bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  src: url("./assets/fonts/JetBrains_Mono/JetBrainsMono-VariableFont_wght.ttf")
+    format("truetype-variations");
+}
+
+:root {
+  --radius: 8px;
+  --background: oklch(0.245 0.014 268);
+  --foreground: oklch(0.9 0.03 270);
+  --card: oklch(0.3 0.02 270);
+  --card-bright: color-mix(in oklch, var(--card), var(--muted-foreground) 12%);
+  --muted: oklch(0.28 0.02 270);
+  --muted-foreground: oklch(0.65 0.04 275);
+  --primary: oklch(0.7 0.035 275 / 0.8);
+  --primary-foreground: oklch(0.21 0.006 285);
+  --secondary: oklch(0.5 0.25 260);
+  --secondary-foreground: oklch(0.9 0.15 250);
+  --accent: oklch(0.38 0.02 270 / 0.75);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.5 0.2 18);
+  --destructive-foreground: oklch(1 0.12 20);
+  --warning-fg: oklch(0.95 0.33 20);
+  --border: oklch(0.32 0.022 275);
+  --border-bright: color-mix(in oklch, var(--border), var(--muted-foreground) 10%);
+  --input: oklch(0.25 0.018 275 / 0.8);
+  --ring: oklch(0.7 0.5 255);
+  --table: oklch(0.28 0.02 265);
+  --table-header: oklch(0.23 0.016 265);
+  --header: oklch(0.28 0.02 270);
+  --status-done-fg: oklch(0.7 0.3 160);
+  --status-done-bg: oklch(0.3 0.1 160 / 0.5);
+  --status-active-fg: oklch(0.78 0.2 255);
+  --status-active-bg: oklch(0.35 0.12 255);
+  --project-fg: oklch(0.85 0.11 76);
+  --shadow-panel: 0 8px 16px rgb(0 0 0 / 0.2);
+  --scrollbar-bg: oklch(0.225 0.014 265);
+  --scrollbar-fg: oklch(0.29 0.02 265);
+  --scrollbar-hover: oklch(0.35 0.02 265);
+  color: var(--foreground);
+  background: var(--background);
+  font-family: "Titillium", "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  height: 9px;
+  width: 9px;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-fg);
+  border: 1px solid var(--scrollbar-bg);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+}
+
+button,
+select {
+  border: 1px solid color-mix(in oklch, var(--muted-foreground), transparent 80%);
+  border-radius: 6px;
+  background: var(--input);
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 30px;
+  outline: none;
+  padding: 5px 12px;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    filter 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+button:hover,
+select:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+button:active {
+  opacity: 0.72;
+  transform: scale(0.98);
+}
+
+button:focus-visible,
+select:focus-visible,
+input[type="checkbox"]:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 52%);
+}
+
+button:disabled,
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  background: var(--card-bright);
+  border: 1px solid color-mix(in oklch, var(--muted-foreground), transparent 45%);
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-grid;
+  height: 14px;
+  margin: 0;
+  place-content: center;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+  vertical-align: middle;
+  width: 14px;
+}
+
+input[type="checkbox"]::before {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  color: var(--primary-foreground);
+  content: "";
+  height: 8px;
+  opacity: 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+  width: 4px;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+input[type="checkbox"]:checked::before {
+  opacity: 1;
+}
+
+.app {
+  background: linear-gradient(180deg, color-mix(in oklch, var(--background), var(--card) 40%), var(--background));
+  display: grid;
+  gap: 10px;
+  grid-template-rows: 54px minmax(0, 1fr) 70px 24px;
+  height: 100%;
+  min-width: 980px;
+  overflow: hidden;
+  padding: 12px 14px;
+}
+
+.workflowBar,
+.tableWrap,
+.logCompact {
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--card), transparent 3%);
+  box-shadow: var(--shadow-panel);
+  min-width: 0;
+}
+
+.workflowBar {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.workflowControls,
+.workflowActions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workflowControls {
+  flex: 1;
+  overflow: hidden;
+}
+
+.workflowControls label {
+  align-items: center;
+  color: color-mix(in oklch, var(--foreground), transparent 8%);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.workflowControls select {
+  max-width: 230px;
+  min-width: 168px;
+}
+
+.workflowActions {
+  flex: 0 0 auto;
+}
+
+.telegramReady {
+  border-color: color-mix(in oklch, var(--status-done-fg), transparent 50%);
+}
+
+h1 {
+  color: var(--foreground);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 5px;
+}
+
+p {
+  color: var(--project-fg);
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.dialogForm {
+  display: grid;
+  gap: 12px;
+}
+
+.dialogForm label {
+  display: grid;
+  gap: 6px;
+}
+
+.dialogForm span {
+  color: color-mix(in oklch, var(--muted-foreground), white 12%);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tableWrap {
+  background: var(--table);
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid color-mix(in oklch, var(--table-header), transparent 35%);
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+
+th {
+  background: var(--table-header);
+  color: color-mix(in oklch, var(--muted-foreground), white 10%);
+  font-size: 11px;
+  font-weight: 700;
+  height: 34px;
+  text-align: center;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+th button {
+  background: transparent;
+  border-color: transparent;
+  color: color-mix(in oklch, var(--muted-foreground), white 15%);
+  font-size: 11px;
+  min-height: 24px;
+  padding: 2px 8px;
+}
+
+th button:hover {
+  background: color-mix(in oklch, var(--accent), transparent 30%);
+}
+
+td {
+  background: color-mix(in oklch, var(--table), transparent 4%);
+  color: var(--foreground);
+  height: 46px;
+}
+
+tbody tr {
+  transition: background 150ms ease;
+}
+
+tbody tr:hover td {
+  background: color-mix(in oklch, var(--muted-foreground), transparent 95%);
+}
+
+tr.inactive td {
+  color: color-mix(in oklch, var(--muted-foreground), transparent 18%);
+}
+
+td:nth-child(1),
+td:nth-child(2),
+td:nth-child(3) {
+  text-align: center;
+  width: 70px;
+}
+
+.meta,
+.path,
+.logCompact,
+.logWindowBody {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.meta {
+  color: color-mix(in oklch, var(--muted-foreground), white 12%);
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+  white-space: pre-line;
+  width: 112px;
+}
+
+.path {
+  color: color-mix(in oklch, var(--foreground), transparent 4%);
+  font-size: 11px;
+  line-height: 1.2;
+  min-width: 520px;
+  max-width: 680px;
+}
+
+.path div {
+  height: 15px;
+  line-height: 15px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path div + div {
+  color: var(--muted-foreground);
+  margin-top: 1px;
+}
+
+.path .alert,
+.status .alert {
+  color: var(--warning-fg);
+}
+
+.status {
+  color: var(--project-fg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  min-width: 170px;
+  text-align: center;
+}
+
+.status > div {
+  display: block;
+  height: 15px;
+  line-height: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  min-width: 116px;
+  text-align: right;
+  white-space: nowrap;
+  width: 116px;
+}
+
+.actions button {
+  min-height: 30px;
+  padding: 0;
+}
+
+.actions button + button {
+  margin-left: 6px;
+}
+
+.empty {
+  color: var(--muted-foreground);
+  height: 180px;
+  text-align: center;
+}
+
+.logCompact {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.logCompactBody {
+  color: color-mix(in oklch, var(--muted-foreground), white 8%);
+  flex: 1;
+  font-size: 10px;
+  line-height: 1.3;
+  max-height: 52px;
+  min-width: 0;
+  overflow: auto;
+}
+
+.logCompactBody div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusBar {
+  align-items: center;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(160px, 1fr) minmax(42px, auto);
+  min-height: 24px;
+  min-width: 0;
+}
+
+.statusBar progress {
+  appearance: none;
+  background: color-mix(in oklch, var(--muted), transparent 20%);
+  border: 0;
+  border-radius: 999px;
+  height: 5px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.statusBar progress::-webkit-progress-bar {
+  background: color-mix(in oklch, var(--muted), transparent 20%);
+  border-radius: 999px;
+}
+
+.statusBar progress::-webkit-progress-value {
+  background: linear-gradient(90deg, oklch(0.68 0.2 252), oklch(0.7 0.18 285));
+  border-radius: 999px;
+}
+
+.statusBar span {
+  color: color-mix(in oklch, var(--muted-foreground), white 12%);
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 42px;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.logWindow {
+  background: var(--background);
+  display: grid;
+  gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.logWindow header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.logWindow h1 {
+  font-size: 18px;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logWindow header span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.logWindowBody {
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--card), transparent 3%);
+  color: color-mix(in oklch, var(--muted-foreground), white 8%);
+  font-size: 11px;
+  line-height: 1.45;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 10px 12px;
+}
+
+.logWindowBody div {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.appError {
+  align-content: center;
+  background: var(--background);
+  display: grid;
+  gap: 12px;
+  height: 100%;
+  justify-items: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.appError h1 {
+  margin: 0;
+}
+
+.appError p {
+  color: var(--warning-fg);
+  max-width: 640px;
+  overflow-wrap: anywhere;
+}
+
+.appError div {
+  display: flex;
+  gap: 8px;
+}

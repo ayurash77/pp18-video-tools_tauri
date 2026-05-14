@@ -1,0 +1,10 @@
+node_modules/
+.pnpm-store/
+.idea/
+dist/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/bin/*
+.DS_Store
+.env
+.env.local
