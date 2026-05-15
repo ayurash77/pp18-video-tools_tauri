@@ -127,6 +127,7 @@ const idleUpdateState: UpdateState = {
 };
 
 const logStorageKey = "pp18VideoToolsLog";
+const logSessionKey = "pp18VideoToolsLogSession";
 const processingOptionsStorageKey = "processingOptions";
 
 type AppErrorBoundaryState = {
@@ -234,6 +235,26 @@ function writeStoredLog(lines: string[]) {
     localStorage.setItem(logStorageKey, JSON.stringify(lines.slice(0, 400)));
   } catch {
     // Keep the UI alive even when WebView storage is unavailable or full.
+  }
+}
+
+function prepareSessionLog(isLogWindow: boolean) {
+  if (isLogWindow) {
+    return;
+  }
+
+  try {
+    if (sessionStorage.getItem(logSessionKey)) {
+      return;
+    }
+    localStorage.removeItem(logStorageKey);
+    sessionStorage.setItem(logSessionKey, String(Date.now()));
+  } catch {
+    try {
+      localStorage.removeItem(logStorageKey);
+    } catch {
+      // Logging is best-effort; startup must continue even if storage is unavailable.
+    }
   }
 }
 
@@ -1299,6 +1320,9 @@ function LogWindow() {
   );
 }
 
+const isLogWindow = window.location.hash === "#logs";
+prepareSessionLog(isLogWindow);
+
 createRoot(document.getElementById("root")!).render(
-  <AppErrorBoundary>{window.location.hash === "#logs" ? <LogWindow /> : <App />}</AppErrorBoundary>,
+  <AppErrorBoundary>{isLogWindow ? <LogWindow /> : <App />}</AppErrorBoundary>,
 );
