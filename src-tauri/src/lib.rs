@@ -287,53 +287,56 @@ fn cancel_actions(control: tauri::State<'_, WorkflowControl>) {
 fn reveal_in_folder(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        return Command::new("explorer.exe")
+        Command::new("explorer.exe")
             .arg(format!("/select,{}", path))
             .spawn()
             .map(|_| ())
-            .map_err(|error| error.to_string());
+            .map_err(|error| error.to_string())
     }
 
     #[cfg(target_os = "macos")]
-    let status = Command::new("/usr/bin/open").args(["-R", &path]).status();
+    {
+        open_command_status(Command::new("/usr/bin/open").args(["-R", &path]).status())
+    }
 
     #[cfg(all(unix, not(target_os = "macos")))]
-    let status = Command::new("xdg-open")
-        .arg(
-            std::path::Path::new(&path)
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new(&path)),
+    {
+        open_command_status(
+            Command::new("xdg-open")
+                .arg(
+                    std::path::Path::new(&path)
+                        .parent()
+                        .unwrap_or_else(|| std::path::Path::new(&path)),
+                )
+                .status(),
         )
-        .status();
-
-    status
-        .map_err(|error| error.to_string())
-        .and_then(|status| {
-            status
-                .success()
-                .then_some(())
-                .ok_or_else(|| "Команда открытия завершилась с ошибкой".to_string())
-        })
+    }
 }
 
 #[tauri::command]
 fn open_in_system_player(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        return Command::new("rundll32.exe")
+        Command::new("rundll32.exe")
             .arg("url.dll,FileProtocolHandler")
             .arg(path)
             .spawn()
             .map(|_| ())
-            .map_err(|error| error.to_string());
+            .map_err(|error| error.to_string())
     }
 
     #[cfg(target_os = "macos")]
-    let status = Command::new("/usr/bin/open").arg(path).status();
+    {
+        open_command_status(Command::new("/usr/bin/open").arg(path).status())
+    }
 
     #[cfg(all(unix, not(target_os = "macos")))]
-    let status = Command::new("xdg-open").arg(path).status();
+    {
+        open_command_status(Command::new("xdg-open").arg(path).status())
+    }
+}
 
+fn open_command_status(status: std::io::Result<std::process::ExitStatus>) -> Result<(), String> {
     status
         .map_err(|error| error.to_string())
         .and_then(|status| {
