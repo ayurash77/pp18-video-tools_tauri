@@ -299,6 +299,35 @@ p {
   font-weight: 700;
 }
 
+.updateNotes,
+.updateProgress,
+.updateError {
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px 12px;
+}
+
+.updateNotes {
+  background: color-mix(in oklch, var(--muted), transparent 30%);
+  color: color-mix(in oklch, var(--foreground), transparent 6%);
+  white-space: pre-wrap;
+}
+
+.updateProgress {
+  background: color-mix(in oklch, var(--status-active-bg), transparent 40%);
+  color: color-mix(in oklch, var(--status-active-fg), white 8%);
+  font-weight: 700;
+}
+
+.updateError {
+  background: color-mix(in oklch, var(--destructive), transparent 70%);
+  color: var(--destructive-foreground);
+  overflow-wrap: anywhere;
+}
+
 .tableWrap {
   background: var(--table);
   min-height: 0;

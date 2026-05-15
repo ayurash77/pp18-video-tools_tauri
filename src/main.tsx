@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { open } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { check } from "@tauri-apps/plugin-updater";
+import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -73,6 +73,14 @@ type TelegramSettingsState = {
   hasChatId: boolean;
 };
 
+type UpdateState =
+  | { status: "idle"; update: null; error: null; progress: string }
+  | { status: "checking"; update: null; error: null; progress: string }
+  | { status: "available"; update: Update; error: null; progress: string }
+  | { status: "installing"; update: Update; error: null; progress: string }
+  | { status: "ready"; update: Update; error: null; progress: string }
+  | { status: "error"; update: Update | null; error: string; progress: string };
+
 const videoExtensions = new Set([
   "3g2",
   "3gp",
@@ -109,6 +117,13 @@ const defaultOptions: ProcessingOptions = {
   duplicateMode: "aggressive",
   convertTo25Fps: true,
   existingMode: "skip",
+};
+
+const idleUpdateState: UpdateState = {
+  status: "idle",
+  update: null,
+  error: null,
+  progress: "",
 };
 
 const logStorageKey = "pp18VideoToolsLog";
@@ -220,6 +235,22 @@ function writeStoredLog(lines: string[]) {
   } catch {
     // Keep the UI alive even when WebView storage is unavailable or full.
   }
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
 }
 
 function isDuplicateMode(value: unknown): value is DuplicateMode {
@@ -342,6 +373,8 @@ function App() {
   const [telegramOpen, setTelegramOpen] = useState(false);
   const [telegramSettings, setTelegramSettings] = useState<TelegramSettingsState | null>(null);
   const [telegramDraft, setTelegramDraft] = useState({ botToken: "", chatId: "" });
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [updateState, setUpdateState] = useState<UpdateState>(idleUpdateState);
   const compactLogRef = useRef<HTMLDivElement | null>(null);
 
   const existenceKey = useMemo(
@@ -426,20 +459,80 @@ function App() {
 
   async function checkForAppUpdate() {
     try {
+      setUpdateState({ status: "checking", update: null, error: null, progress: "" });
       appendLog("Проверка обновлений...");
       const update = await check();
       if (!update) {
+        setUpdateState(idleUpdateState);
         appendLog("Обновлений нет.");
         return;
       }
 
-      appendLog(`Найдено обновление ${update.version}. Установка...`);
-      await update.downloadAndInstall();
-      appendLog("Обновление установлено. Перезапуск...");
-      await relaunch();
+      setUpdateState({ status: "available", update, error: null, progress: "" });
+      setStatusText(`Доступно обновление ${update.version}`);
+      setUpdateDialogOpen(true);
+      appendLog(`Найдено обновление ${update.version}. Ожидает подтверждения.`);
     } catch (error) {
-      appendLog(`Не удалось проверить или установить обновление: ${String(error)}`);
+      setUpdateState({ status: "error", update: null, error: String(error), progress: "" });
+      appendLog(`Не удалось проверить обновление: ${String(error)}`);
     }
+  }
+
+  async function installAppUpdate() {
+    const update = updateState.update;
+    if (!update || updateState.status === "installing") {
+      return;
+    }
+
+    try {
+      setUpdateState({ status: "installing", update, error: null, progress: "Подготовка..." });
+      setStatusText(`Установка обновления ${update.version}`);
+      appendLog(`Установка обновления ${update.version}...`);
+      let downloaded = 0;
+      let total: number | null = null;
+
+      await update.downloadAndInstall((event: DownloadEvent) => {
+        if (event.event === "Started") {
+          total = typeof event.data.contentLength === "number" ? event.data.contentLength : null;
+        }
+        if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+        }
+        const progress = updateProgressText(event, downloaded, total);
+        setUpdateState({ status: "installing", update, error: null, progress });
+      });
+
+      setUpdateState({ status: "ready", update, error: null, progress: "Установлено" });
+      setStatusText("Обновление установлено. Нужен перезапуск");
+      appendLog("Обновление установлено. Требуется перезапуск.");
+    } catch (error) {
+      const message = String(error);
+      setUpdateState({ status: "error", update, error: message, progress: "" });
+      setStatusText("Ошибка обновления");
+      appendLog(`Не удалось установить обновление: ${message}`);
+    }
+  }
+
+  function updateProgressText(event: DownloadEvent, downloaded: number, total: number | null): string {
+    if (event.event === "Started") {
+      return total ? `Загрузка: 0/${formatBytes(total)}` : "Загрузка...";
+    }
+    if (event.event === "Progress") {
+      return total ? `Загрузка: ${formatBytes(downloaded)}/${formatBytes(total)}` : `Загружено: ${formatBytes(downloaded)}`;
+    }
+    return "Установка...";
+  }
+
+  function closeUpdateDialog(open: boolean) {
+    if (!open && updateState.status === "installing") {
+      return;
+    }
+    setUpdateDialogOpen(open);
+  }
+
+  async function restartApp() {
+    appendLog("Перезапуск приложения...");
+    await relaunch();
   }
 
   async function saveTelegramSettings() {
@@ -893,6 +986,59 @@ function App() {
             <Button type="button" onClick={saveTelegramSettings}>
               Сохранить
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={updateDialogOpen} onOpenChange={closeUpdateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {updateState.status === "ready"
+                ? "Обновление установлено"
+                : updateState.status === "error"
+                  ? "Ошибка обновления"
+                  : "Доступно обновление"}
+            </DialogTitle>
+            <DialogDescription>
+              {updateState.update
+                ? updateState.status === "ready"
+                  ? `Версия ${updateState.update.version} установлена. Перезапустите приложение, чтобы перейти на нее.`
+                  : `Найдена версия ${updateState.update.version}. Установить сейчас?`
+                : updateState.error ?? "Не удалось проверить обновление."}
+            </DialogDescription>
+          </DialogHeader>
+          {updateState.update?.body ? <div className="updateNotes">{updateState.update.body}</div> : null}
+          {updateState.progress ? <div className="updateProgress">{updateState.progress}</div> : null}
+          {updateState.error ? <div className="updateError">{updateState.error}</div> : null}
+          <DialogFooter>
+            {updateState.status === "ready" ? (
+              <>
+                <Button type="button" variant="outline" onClick={() => setUpdateDialogOpen(false)}>
+                  Позже
+                </Button>
+                <Button type="button" onClick={restartApp}>
+                  Перезапустить
+                </Button>
+              </>
+            ) : updateState.status === "installing" ? (
+              <Button disabled type="button">
+                Установка...
+              </Button>
+            ) : updateState.status === "error" ? (
+              <Button type="button" variant="outline" onClick={() => setUpdateDialogOpen(false)}>
+                Закрыть
+              </Button>
+            ) : (
+              <>
+                <Button type="button" variant="outline" onClick={() => setUpdateDialogOpen(false)}>
+                  Позже
+                </Button>
+                <Button disabled={!updateState.update} type="button" onClick={installAppUpdate}>
+                  Установить
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
