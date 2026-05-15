@@ -54,6 +54,7 @@
   --border-bright: color-mix(in oklch, var(--border), var(--muted-foreground) 10%);
   --input: oklch(0.25 0.018 275 / 0.8);
   --ring: oklch(0.7 0.5 255);
+  --focus-shadow: 0 0 0 2px color-mix(in oklch, var(--ring), transparent 50%);
   --table: oklch(0.28 0.02 265);
   --table-header: oklch(0.23 0.016 265);
   --header: oklch(0.28 0.02 270);
@@ -116,7 +117,7 @@ body {
   background: var(--scrollbar-hover);
 }
 
-button,
+button:not(.ui-checkbox),
 select {
   border: 1px solid color-mix(in oklch, var(--muted-foreground), transparent 80%);
   border-radius: 6px;
@@ -138,41 +139,46 @@ select {
     transform 150ms ease;
 }
 
-button:hover,
+button:not(.ui-checkbox):hover,
 select:hover {
   background: var(--accent);
   color: var(--accent-foreground);
 }
 
-button:active {
+button:not(.ui-checkbox):active {
   opacity: 0.72;
   transform: scale(0.98);
 }
 
-button:focus-visible,
-select:focus-visible,
-input[type="checkbox"]:focus-visible {
+button:not(.ui-checkbox):focus-visible,
+select:focus-visible {
   border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 52%);
+  box-shadow: var(--focus-shadow);
 }
 
-button:disabled,
+button:not(.ui-checkbox):disabled,
 select:disabled,
 input:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-input[type="checkbox"] {
-  appearance: none;
+.ui-checkbox {
+  align-items: center;
   background: var(--card-bright);
   border: 1px solid color-mix(in oklch, var(--muted-foreground), transparent 45%);
   border-radius: 3px;
+  color: var(--primary-foreground);
   cursor: pointer;
-  display: inline-grid;
+  display: inline-flex;
   height: 14px;
+  justify-content: center;
   margin: 0;
-  place-content: center;
+  min-height: 0;
+  min-width: 0;
+  outline: none;
+  padding: 0;
+  flex-shrink: 0;
   transition:
     background 150ms ease,
     border-color 150ms ease,
@@ -181,24 +187,33 @@ input[type="checkbox"] {
   width: 14px;
 }
 
-input[type="checkbox"]::before {
-  border-bottom: 2px solid currentColor;
-  border-right: 2px solid currentColor;
-  color: var(--primary-foreground);
-  content: "";
-  height: 8px;
-  opacity: 0;
-  transform: rotate(45deg) translate(-1px, -1px);
-  width: 4px;
+.ui-checkbox:hover {
+  border-color: color-mix(in oklch, var(--muted-foreground), transparent 25%);
 }
 
-input[type="checkbox"]:checked {
+.ui-checkbox:focus-visible {
+  border-color: var(--ring);
+  box-shadow: var(--focus-shadow);
+}
+
+.ui-checkbox[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ui-checkbox[data-state="checked"] {
   background: var(--primary);
   border-color: var(--primary);
 }
 
-input[type="checkbox"]:checked::before {
-  opacity: 1;
+.ui-checkbox-indicator {
+  display: grid;
+  place-content: center;
+}
+
+.ui-checkbox-indicator svg {
+  height: 11px;
+  width: 11px;
 }
 
 .app {
@@ -287,7 +302,7 @@ input[type="checkbox"]:checked::before {
 
 .ui-select-trigger:focus-visible {
   border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 52%);
+  box-shadow: var(--focus-shadow);
 }
 
 .ui-select-trigger[data-disabled] {

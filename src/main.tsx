@@ -917,11 +917,7 @@ function App() {
             <Checkbox
               checked={options.latestVersionsOnly}
               disabled={running}
-              onChange={(event) => {
-                const latestVersionsOnly = event.currentTarget.checked;
-                setLatestVersionsOnly(latestVersionsOnly);
-              }}
-              type="checkbox"
+              onCheckedChange={(checked) => setLatestVersionsOnly(checked === true)}
             />
             Последние версии
           </label>
@@ -929,11 +925,9 @@ function App() {
             <Checkbox
               checked={options.removeDupes}
               disabled={running}
-              onChange={(event) => {
-                const removeDupes = event.currentTarget.checked;
-                setOptions((current) => ({ ...current, removeDupes }));
+              onCheckedChange={(checked) => {
+                setOptions((current) => ({ ...current, removeDupes: checked === true }));
               }}
-              type="checkbox"
             />
             Удалять дублирующиеся кадры
           </label>
@@ -963,11 +957,9 @@ function App() {
             <Checkbox
               checked={options.convertTo25Fps}
               disabled={running}
-              onChange={(event) => {
-                const convertTo25Fps = event.currentTarget.checked;
-                setOptions((current) => ({ ...current, convertTo25Fps }));
+              onCheckedChange={(checked) => {
+                setOptions((current) => ({ ...current, convertTo25Fps: checked === true }));
               }}
-              type="checkbox"
             />
             25 fps без добавления кадров
           </label>
@@ -1195,33 +1187,21 @@ function App() {
                       <Checkbox
                         checked={row.fixes}
                         disabled={running}
-                        onChange={(event) => {
-                          const fixes = event.currentTarget.checked;
-                          updateRow(row.path, { fixes });
-                        }}
-                        type="checkbox"
+                        onCheckedChange={(checked) => updateRow(row.path, { fixes: checked === true })}
                       />
                     </TableCell>
                     <TableCell>
                       <Checkbox
                         checked={row.preview}
                         disabled={running}
-                        onChange={(event) => {
-                          const preview = event.currentTarget.checked;
-                          updateRow(row.path, { preview });
-                        }}
-                        type="checkbox"
+                        onCheckedChange={(checked) => updateRow(row.path, { preview: checked === true })}
                       />
                     </TableCell>
                     <TableCell>
                       <Checkbox
                         checked={row.telegram}
                         disabled={running}
-                        onChange={(event) => {
-                          const telegram = event.currentTarget.checked;
-                          updateRow(row.path, { telegram });
-                        }}
-                        type="checkbox"
+                        onCheckedChange={(checked) => updateRow(row.path, { telegram: checked === true })}
                       />
                     </TableCell>
                     <TableCell className="meta">
