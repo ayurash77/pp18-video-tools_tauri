@@ -376,6 +376,7 @@ function App() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>(idleUpdateState);
   const compactLogRef = useRef<HTMLDivElement | null>(null);
+  const metadataBatchRef = useRef(0);
 
   const existenceKey = useMemo(
     () => rows.map((row) => `${row.path}|${row.fixes}|${row.preview}|${row.telegram}`).join("\n"),
@@ -606,6 +607,9 @@ function App() {
     });
 
     const paths = Array.isArray(selected) ? selected : selected ? [selected] : [];
+    if (paths.length > 0) {
+      setStatusText(`Добавление файлов: ${paths.length}`);
+    }
     applyVideoPaths(paths, "Выбрано видеофайлов");
   }
 
@@ -621,9 +625,11 @@ function App() {
     }
 
     try {
+      setStatusText("Чтение папки...");
       const paths = await invoke<string[]>("folder_files", { path: selected });
       applyVideoPaths(paths, "В папке найдено видеофайлов");
     } catch (error) {
+      setStatusText("Ошибка чтения папки");
       appendLog(`Не удалось прочитать папку: ${String(error)}`);
     }
   }
@@ -654,7 +660,7 @@ function App() {
       fixes: false,
       preview: true,
       telegram: true,
-      metadataStatus: "idle",
+      metadataStatus: "loading",
     }));
 
     setRows(nextRows);
@@ -664,9 +670,7 @@ function App() {
         ? `${logPrefix}: ${nextRows.length}; скрыто старых версий: ${allVideos.length - videos.length}`
         : `${logPrefix}: ${nextRows.length}`,
     );
-    for (const row of nextRows) {
-      void loadMetadata(row.path);
-    }
+    queueMetadataLoading(nextRows.map((row) => row.path));
   }
 
   function setLatestVersionsOnly(latestVersionsOnly: boolean) {
@@ -676,36 +680,69 @@ function App() {
     }
 
     const nextRows = buildRows(sourcePaths, latestVersionsOnly);
-    setRows(nextRows);
-    setStatusText(nextRows.length ? `Всего файлов: ${nextRows.length}` : "Файлы не выбраны");
+    const rowsWithLoading = nextRows.map((row) =>
+      row.metadataStatus === "idle" ? { ...row, metadataStatus: "loading" as const } : row,
+    );
+    setRows(rowsWithLoading);
+    setStatusText(rowsWithLoading.length ? `Всего файлов: ${rowsWithLoading.length}` : "Файлы не выбраны");
 
     const hidden = sourcePaths.length - nextRows.length;
     appendLog(
       latestVersionsOnly
-        ? `Фильтр последних версий включен: ${nextRows.length}; скрыто старых версий: ${hidden}`
-        : `Фильтр последних версий выключен: ${nextRows.length}`,
+        ? `Фильтр последних версий включен: ${rowsWithLoading.length}; скрыто старых версий: ${hidden}`
+        : `Фильтр последних версий выключен: ${rowsWithLoading.length}`,
     );
 
-    for (const row of nextRows) {
-      if (row.metadataStatus === "idle") {
-        void loadMetadata(row.path);
-      }
-    }
+    queueMetadataLoading(
+      rowsWithLoading
+        .filter((row) => row.metadataStatus === "loading" && !row.metadata)
+        .map((row) => row.path),
+    );
   }
 
-  async function loadMetadata(path: string) {
-    setRows((current) =>
-      current.map((row) => (row.path === path ? { ...row, metadataStatus: "loading" } : row)),
-    );
+  function queueMetadataLoading(paths: string[]) {
+    const pending = uniqueSorted(paths);
+    const batch = metadataBatchRef.current + 1;
+    metadataBatchRef.current = batch;
+    if (pending.length === 0) {
+      return;
+    }
 
+    window.setTimeout(() => {
+      void loadMetadataQueue(pending, batch);
+    }, 0);
+  }
+
+  async function loadMetadataQueue(paths: string[], batch: number) {
+    const concurrency = Math.min(3, paths.length);
+    let index = 0;
+
+    await Promise.all(
+      Array.from({ length: concurrency }, async () => {
+        while (metadataBatchRef.current === batch && index < paths.length) {
+          const path = paths[index];
+          index += 1;
+          await loadMetadata(path, batch);
+        }
+      }),
+    );
+  }
+
+  async function loadMetadata(path: string, batch: number) {
     try {
       const metadata = await invoke<VideoMetadata>("probe_video", { path });
+      if (metadataBatchRef.current !== batch) {
+        return;
+      }
       setRows((current) =>
         current.map((row) =>
           row.path === path ? { ...row, metadata, metadataStatus: "ready" } : row,
         ),
       );
     } catch (error) {
+      if (metadataBatchRef.current !== batch) {
+        return;
+      }
       setRows((current) =>
         current.map((row) => (row.path === path ? { ...row, metadataStatus: "error" } : row)),
       );
