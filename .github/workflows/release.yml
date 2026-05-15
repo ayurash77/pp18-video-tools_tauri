@@ -107,3 +107,11 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Verify macOS app signature
+        if: runner.os == 'macOS'
+        run: |
+          app_path="$(find src-tauri/target -path '*/release/bundle/macos/PP18 Video Tools.app' -type d -print -quit)"
+          test -n "$app_path"
+          test -f "$app_path/Contents/_CodeSignature/CodeResources"
+          codesign --verify --deep --strict --verbose=4 "$app_path"

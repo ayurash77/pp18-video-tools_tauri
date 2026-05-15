@@ -90,7 +90,7 @@ The app was successfully built as:
 
 ```text
 src-tauri/target/release/bundle/macos/PP18 Video Tools.app
-src-tauri/target/release/bundle/dmg/PP18 Video Tools_0.1.1_aarch64.dmg
+src-tauri/target/release/bundle/dmg/PP18 Video Tools_0.1.2_aarch64.dmg
 ```
 
 ## Current Limitations
@@ -235,11 +235,16 @@ Add the private key content to GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`
 The current generated key has no password, so the release workflow does not pass
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
+macOS bundles use ad-hoc signing through `bundle.macOS.signingIdentity: "-"`.
+This creates a valid app resource seal and avoids broken-bundle Gatekeeper
+errors. Fully trusted first-run behavior requires Developer ID signing and
+Apple notarization secrets.
+
 Release workflow trigger:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 ## Suggested Next Steps

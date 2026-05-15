@@ -87,11 +87,14 @@ Create a release by bumping the version in both `package.json` and `src-tauri/Ca
 / `src-tauri/tauri.conf.json`, then pushing a tag:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 `ffmpeg` and `ffprobe` binaries are not stored in Git. Local copies live in
 `src-tauri/bin`, and the release workflow downloads platform binaries before
 building installers. macOS release jobs download target-specific binaries:
 `arm64` for `aarch64-apple-darwin` and `amd64` for `x86_64-apple-darwin`.
+macOS bundles are ad-hoc signed with `bundle.macOS.signingIdentity: "-"` so
+the app bundle has a valid resource seal. Fully trusted first-run behavior still
+requires an Apple Developer ID certificate and notarization.
