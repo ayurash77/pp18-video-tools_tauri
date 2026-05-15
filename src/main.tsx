@@ -636,22 +636,40 @@ function App() {
 
   async function chooseFolder() {
     const selected = await open({
-      multiple: false,
+      multiple: true,
       directory: true,
-      title: "Выберите папку с видео",
+      title: "Выберите папки с видео",
     });
 
-    if (!selected || Array.isArray(selected)) {
+    const folders = Array.isArray(selected) ? selected : selected ? [selected] : [];
+    if (folders.length === 0) {
       return;
     }
 
-    try {
-      setStatusText("Чтение папки...");
-      const paths = await invoke<string[]>("folder_files", { path: selected });
-      applyVideoPaths(paths, "В папке найдено видеофайлов");
-    } catch (error) {
-      setStatusText("Ошибка чтения папки");
-      appendLog(`Не удалось прочитать папку: ${String(error)}`);
+    setStatusText(folders.length === 1 ? "Чтение папки..." : `Чтение папок: ${folders.length}`);
+    const results = await Promise.all(
+      folders.map(async (folder) => {
+        try {
+          const paths = await invoke<string[]>("folder_files", { path: folder });
+          return { folder, paths, error: null as string | null };
+        } catch (error) {
+          return { folder, paths: [], error: String(error) };
+        }
+      }),
+    );
+
+    const paths = results.flatMap((result) => result.paths);
+    applyVideoPaths(
+      paths,
+      folders.length === 1 ? "В папке найдено видеофайлов" : "В папках найдено видеофайлов",
+    );
+
+    const failed = results.filter((result) => result.error);
+    if (failed.length > 0) {
+      appendLog(`Не удалось прочитать папки: ${failed.length}/${folders.length}`);
+      for (const result of failed.slice(0, 3)) {
+        appendLog(`${fileName(result.folder)}: ${result.error}`);
+      }
     }
   }
 
