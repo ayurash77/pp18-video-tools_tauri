@@ -962,8 +962,7 @@ fn make_caption_html(input: &str) -> String {
 }
 
 fn telegram_reply_markup(input: &str) -> Result<String, String> {
-    let mac_path = native_path(input);
-    let windows_path = windows_work_path(&mac_path);
+    let (mac_path, windows_path) = telegram_copy_paths(input);
     let reply_markup = serde_json::json!({
         "inline_keyboard": [[
             { "text": "MacOS path", "copy_text": { "text": mac_path } },
@@ -971,6 +970,18 @@ fn telegram_reply_markup(input: &str) -> Result<String, String> {
         ]]
     });
     serde_json::to_string(&reply_markup).map_err(|error| error.to_string())
+}
+
+fn telegram_copy_paths(input: &str) -> (String, String) {
+    let path = native_path(input);
+    if let Some(rest) = mac_work_path_rest(&path) {
+        return (mac_work_path(&rest), windows_work_path(&rest));
+    }
+    if let Some(rest) = windows_work_path_rest(&path) {
+        return (mac_work_path(&rest), windows_work_path(&rest));
+    }
+
+    (path.clone(), path)
 }
 
 fn short_display_path(file_path: &str) -> String {
@@ -999,16 +1010,46 @@ fn short_display_path(file_path: &str) -> String {
     }
 }
 
-fn windows_work_path(mac_path: &str) -> String {
+fn mac_work_path_rest(path: &str) -> Option<String> {
     const MAC_WORK_PREFIX: &str = "/Volumes/work";
-    let rest = if mac_path == MAC_WORK_PREFIX {
-        String::new()
-    } else if let Some(rest) = mac_path.strip_prefix(&format!("{MAC_WORK_PREFIX}/")) {
-        rest.to_string()
+    if path == MAC_WORK_PREFIX {
+        Some(String::new())
     } else {
-        mac_path.to_string()
-    };
+        path.strip_prefix(&format!("{MAC_WORK_PREFIX}/"))
+            .map(|rest| rest.to_string())
+    }
+}
+
+fn windows_work_path_rest(path: &str) -> Option<String> {
+    let normalized = path.replace('/', "\\");
+    let lower = normalized.to_lowercase();
+    if lower == "w:" || lower == "w:\\" {
+        return Some(String::new());
+    }
+    if lower.starts_with("w:\\") {
+        Some(
+            normalized["w:\\".len()..]
+                .trim_start_matches('\\')
+                .to_string(),
+        )
+    } else {
+        None
+    }
+}
+
+fn mac_work_path(rest: &str) -> String {
+    let rest = rest.replace('\\', "/");
+    let rest = rest.trim_start_matches('/');
+    if rest.is_empty() {
+        "/Volumes/work".to_string()
+    } else {
+        format!("/Volumes/work/{rest}")
+    }
+}
+
+fn windows_work_path(rest: &str) -> String {
     let rest = rest.replace('/', "\\");
+    let rest = rest.trim_start_matches('\\');
     if rest.is_empty() {
         "w:\\".to_string()
     } else {
@@ -1023,6 +1064,43 @@ fn escape_html(value: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn telegram_copy_paths_from_mac_work_path() {
+        let (mac_path, windows_path) =
+            telegram_copy_paths("/Volumes/work/2026-2/Vyazanka/out/VYAZ_040_v00.mov");
+
+        assert_eq!(
+            mac_path,
+            "/Volumes/work/2026-2/Vyazanka/out/VYAZ_040_v00.mov"
+        );
+        assert_eq!(windows_path, "w:\\2026-2\\Vyazanka\\out\\VYAZ_040_v00.mov");
+    }
+
+    #[test]
+    fn telegram_copy_paths_from_windows_work_path() {
+        let (mac_path, windows_path) =
+            telegram_copy_paths(r"W:\2026-2\Vyazanka\out\VYAZ_040_v00.mov");
+
+        assert_eq!(
+            mac_path,
+            "/Volumes/work/2026-2/Vyazanka/out/VYAZ_040_v00.mov"
+        );
+        assert_eq!(windows_path, "w:\\2026-2\\Vyazanka\\out\\VYAZ_040_v00.mov");
+    }
+
+    #[test]
+    fn telegram_copy_paths_keep_unmapped_path() {
+        let (mac_path, windows_path) = telegram_copy_paths(r"D:\media\file.mov");
+
+        assert_eq!(mac_path, r"D:\media\file.mov");
+        assert_eq!(windows_path, r"D:\media\file.mov");
+    }
 }
 
 enum ProcessOutcome {
