@@ -20,7 +20,7 @@ import {
 } from "./components/ui/dialog";
 import { Input } from "./components/ui/input";
 import { Panel } from "./components/ui/panel";
-import { Select } from "./components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import "./styles.css";
 
@@ -939,8 +939,8 @@ function App() {
           </label>
           <Select
             disabled={running || !options.removeDupes}
-            onChange={(event) => {
-              const duplicateMode = event.currentTarget.value as DuplicateMode;
+            onValueChange={(value) => {
+              const duplicateMode = value as DuplicateMode;
               setOptions((current) => ({
                 ...current,
                 duplicateMode,
@@ -948,11 +948,16 @@ function App() {
             }}
             value={options.duplicateMode}
           >
-            {Object.entries(duplicateModeLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
+            <SelectTrigger className="workflowSelect" aria-label="Режим удаления дублей">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(duplicateModeLabels).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
           <label>
             <Checkbox
@@ -968,8 +973,8 @@ function App() {
           </label>
           <Select
             disabled={running}
-            onChange={(event) => {
-              const existingMode = event.currentTarget.value as ExistingMode;
+            onValueChange={(value) => {
+              const existingMode = value as ExistingMode;
               setOptions((current) => ({
                 ...current,
                 existingMode,
@@ -977,8 +982,13 @@ function App() {
             }}
             value={options.existingMode}
           >
-            <option value="skip">Пропускать существующие</option>
-            <option value="overwrite">Перезаписывать существующие</option>
+            <SelectTrigger className="workflowSelect" aria-label="Режим существующих файлов">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="skip">Пропускать существующие</SelectItem>
+              <SelectItem value="overwrite">Перезаписывать существующие</SelectItem>
+            </SelectContent>
           </Select>
         </div>
         <div className="workflowActions">

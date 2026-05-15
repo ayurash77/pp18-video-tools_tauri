@@ -255,9 +255,116 @@ input[type="checkbox"]:checked::before {
   white-space: nowrap;
 }
 
-.workflowControls select {
+.workflowSelect {
   max-width: 230px;
   min-width: 168px;
+}
+
+.ui-select-trigger {
+  align-items: center;
+  background: var(--input);
+  border: 1px solid color-mix(in oklch, var(--muted-foreground), transparent 80%);
+  border-radius: 6px;
+  color: var(--foreground);
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+  height: 30px;
+  justify-content: space-between;
+  min-width: 168px;
+  outline: none;
+  padding: 5px 9px 5px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ui-select-trigger:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.ui-select-trigger:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 52%);
+}
+
+.ui-select-trigger[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ui-select-trigger svg {
+  color: color-mix(in oklch, currentColor, transparent 20%);
+  height: 14px;
+  width: 14px;
+}
+
+.ui-select-content {
+  background: color-mix(in oklch, var(--card), black 5%);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  box-shadow: var(--shadow-panel);
+  color: var(--foreground);
+  max-height: min(var(--radix-select-content-available-height), 260px);
+  min-width: var(--radix-select-trigger-width);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.ui-select-viewport {
+  padding: 4px;
+}
+
+.ui-select-item {
+  align-items: center;
+  border-radius: 4px;
+  color: color-mix(in oklch, var(--foreground), transparent 5%);
+  cursor: default;
+  display: flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 28px;
+  outline: none;
+  padding: 5px 28px 5px 8px;
+  position: relative;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.ui-select-item[data-highlighted] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.ui-select-item[data-disabled] {
+  opacity: 0.5;
+}
+
+.ui-select-item-indicator {
+  align-items: center;
+  display: inline-flex;
+  height: 16px;
+  justify-content: center;
+  position: absolute;
+  right: 7px;
+  width: 16px;
+}
+
+.ui-select-item-indicator svg,
+.ui-select-scroll svg {
+  height: 14px;
+  width: 14px;
+}
+
+.ui-select-scroll {
+  align-items: center;
+  color: var(--muted-foreground);
+  display: flex;
+  height: 22px;
+  justify-content: center;
 }
 
 .workflowActions {
