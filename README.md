@@ -83,6 +83,16 @@ The current private key was generated locally at:
 
 The public key is stored in `src-tauri/tauri.conf.json`.
 
+For local/manual installer builds without updater artifacts, use:
+
+```bash
+pnpm tauri:build:local
+```
+
+This avoids requiring `TAURI_SIGNING_PRIVATE_KEY`. Real release builds should
+continue using `pnpm tauri:build` or the GitHub release workflow with
+`TAURI_SIGNING_PRIVATE_KEY` configured.
+
 Create a release by bumping the version in both `package.json` and `src-tauri/Cargo.toml`
 / `src-tauri/tauri.conf.json`, then pushing a tag:
 

@@ -168,6 +168,12 @@ Build Tauri release bundle:
 pnpm tauri:build
 ```
 
+Build a local installer without updater artifacts or updater signing:
+
+```bash
+pnpm tauri:build:local
+```
+
 Known verified state:
 
 ```text

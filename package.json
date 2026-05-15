@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
+    "tauri:build:local": "tauri build --config src-tauri/tauri.local.conf.json",
     "sync-binaries": "node scripts/sync-binaries.mjs"
   },
   "dependencies": {
