@@ -285,13 +285,17 @@ fn cancel_actions(control: tauri::State<'_, WorkflowControl>) {
 
 #[tauri::command]
 fn reveal_in_folder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        return Command::new("explorer.exe")
+            .arg(format!("/select,{}", path))
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| error.to_string());
+    }
+
     #[cfg(target_os = "macos")]
     let status = Command::new("/usr/bin/open").args(["-R", &path]).status();
-
-    #[cfg(target_os = "windows")]
-    let status = Command::new("explorer.exe")
-        .arg(format!("/select,{}", path))
-        .status();
 
     #[cfg(all(unix, not(target_os = "macos")))]
     let status = Command::new("xdg-open")
@@ -314,13 +318,18 @@ fn reveal_in_folder(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn open_in_system_player(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        return Command::new("rundll32.exe")
+            .arg("url.dll,FileProtocolHandler")
+            .arg(path)
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| error.to_string());
+    }
+
     #[cfg(target_os = "macos")]
     let status = Command::new("/usr/bin/open").arg(path).status();
-
-    #[cfg(target_os = "windows")]
-    let status = Command::new("cmd")
-        .args(["/C", "start", "", &path])
-        .status();
 
     #[cfg(all(unix, not(target_os = "macos")))]
     let status = Command::new("xdg-open").arg(path).status();
