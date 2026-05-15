@@ -54,7 +54,7 @@
   --border-bright: color-mix(in oklch, var(--border), var(--muted-foreground) 10%);
   --input: oklch(0.25 0.018 275 / 0.8);
   --ring: oklch(0.7 0.5 255);
-  --focus-shadow: 0 0 0 2px color-mix(in oklch, var(--ring), transparent 50%);
+  --focus-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ring), transparent 20%);
   --table: oklch(0.28 0.02 265);
   --table-header: oklch(0.23 0.016 265);
   --header: oklch(0.28 0.02 270);
