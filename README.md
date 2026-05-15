@@ -93,4 +93,5 @@ git push origin v0.1.1
 
 `ffmpeg` and `ffprobe` binaries are not stored in Git. Local copies live in
 `src-tauri/bin`, and the release workflow downloads platform binaries before
-building installers.
+building installers. macOS release jobs download target-specific binaries:
+`arm64` for `aarch64-apple-darwin` and `amd64` for `x86_64-apple-darwin`.

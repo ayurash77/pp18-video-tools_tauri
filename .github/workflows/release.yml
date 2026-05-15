@@ -17,12 +17,15 @@ jobs:
           - platform: windows-latest
             args: ""
             rust_targets: ""
+            ffmpeg_arch: ""
           - platform: macos-latest
             args: "--target aarch64-apple-darwin"
             rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+            ffmpeg_arch: arm64
           - platform: macos-latest
             args: "--target x86_64-apple-darwin"
             rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+            ffmpeg_arch: amd64
 
     runs-on: ${{ matrix.platform }}
 
@@ -69,13 +72,29 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           mkdir -p src-tauri/bin
-          curl -L "https://evermeet.cx/ffmpeg/getrelease/zip" -o "$RUNNER_TEMP/ffmpeg.zip"
-          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o "$RUNNER_TEMP/ffprobe.zip"
+          curl -L --fail "https://ffmpeg.martin-riedl.de/redirect/latest/macos/${{ matrix.ffmpeg_arch }}/release/ffmpeg.zip" -o "$RUNNER_TEMP/ffmpeg.zip"
+          curl -L --fail "https://ffmpeg.martin-riedl.de/redirect/latest/macos/${{ matrix.ffmpeg_arch }}/release/ffprobe.zip" -o "$RUNNER_TEMP/ffprobe.zip"
           ditto -x -k "$RUNNER_TEMP/ffmpeg.zip" "$RUNNER_TEMP/ffmpeg"
           ditto -x -k "$RUNNER_TEMP/ffprobe.zip" "$RUNNER_TEMP/ffprobe"
           cp "$RUNNER_TEMP/ffmpeg/ffmpeg" src-tauri/bin/ffmpeg
           cp "$RUNNER_TEMP/ffprobe/ffprobe" src-tauri/bin/ffprobe
           chmod +x src-tauri/bin/ffmpeg src-tauri/bin/ffprobe
+
+      - name: Verify FFmpeg binaries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          file src-tauri/bin/ffmpeg
+          file src-tauri/bin/ffprobe
+          case "${{ matrix.ffmpeg_arch }}" in
+            arm64)
+              file src-tauri/bin/ffmpeg | grep -q "arm64"
+              file src-tauri/bin/ffprobe | grep -q "arm64"
+              ;;
+            amd64)
+              file src-tauri/bin/ffmpeg | grep -q "x86_64"
+              file src-tauri/bin/ffprobe | grep -q "x86_64"
+              ;;
+          esac
 
       - uses: tauri-apps/tauri-action@v0
         env:

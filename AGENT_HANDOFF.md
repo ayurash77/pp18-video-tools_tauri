@@ -90,7 +90,7 @@ The app was successfully built as:
 
 ```text
 src-tauri/target/release/bundle/macos/PP18 Video Tools.app
-src-tauri/target/release/bundle/dmg/PP18 Video Tools_0.1.0_aarch64.dmg
+src-tauri/target/release/bundle/dmg/PP18 Video Tools_0.1.1_aarch64.dmg
 ```
 
 ## Current Limitations
@@ -218,6 +218,8 @@ ffprobe.exe
 
 These files are ignored locally and are not stored in Git. The release workflow
 downloads platform binaries into `src-tauri/bin` before running the Tauri build.
+macOS release jobs must download architecture-specific FFmpeg/FFprobe binaries:
+`arm64` for `aarch64-apple-darwin` and `amd64` for `x86_64-apple-darwin`.
 HandBrakeCLI is not used by the Tauri workflow; both fixes and preview encoding use `ffmpeg`.
 
 ## Release and Updates
