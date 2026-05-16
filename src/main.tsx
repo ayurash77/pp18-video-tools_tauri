@@ -3,10 +3,12 @@ import { createRoot } from "react-dom/client";
 import { open } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
+  BugOff,
   ExternalLink,
   Eye,
   Filter,
@@ -19,7 +21,6 @@ import {
   Settings,
   Square,
   Trash2,
-  Wrench,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Checkbox } from "./components/ui/checkbox";
@@ -39,7 +40,9 @@ import "./styles.css";
 
 type VideoMetadata = {
   resolution: string;
+  fps: number | null;
   frames: number | null;
+  duration: number | null;
 };
 
 type DuplicateMode = "soft" | "medium" | "aggressive" | "veryAggressive" | "maximum";
@@ -234,6 +237,35 @@ function parseVersionedPath(path: string): VersionedPath | null {
   };
 }
 
+function formatDuration(seconds: number | null | undefined): string {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds)) {
+    return "---";
+  }
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const rest = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+function formatFps(fps: number | null | undefined): string {
+  if (typeof fps !== "number" || !Number.isFinite(fps)) {
+    return "---";
+  }
+  const rounded = Math.round(fps * 100) / 100;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(2)} fps`;
+}
+
+function metadataCells(metadata: VideoMetadata | undefined, available: boolean): [string, string, string] {
+  if (!available || !metadata) {
+    return ["---", "---", "---"];
+  }
+  return [metadata.resolution || "---", formatFps(metadata.fps), formatDuration(metadata.duration)];
+}
+
 function readStoredLog(): string[] {
   try {
     const value = JSON.parse(localStorage.getItem(logStorageKey) ?? "[]");
@@ -424,6 +456,7 @@ function App() {
   const [sourcePaths, setSourcePaths] = useState<string[]>([]);
   const [log, setLog] = useState<string[]>(() => readStoredLog());
   const [pathExists, setPathExists] = useState<Record<string, boolean>>({});
+  const [metadataByPath, setMetadataByPath] = useState<Record<string, VideoMetadata>>({});
   const [options, setOptions] = useState<ProcessingOptions>(() => loadProcessingOptions());
   const [running, setRunning] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -434,7 +467,6 @@ function App() {
   const [telegramDraft, setTelegramDraft] = useState({ botToken: "", chatId: "" });
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>(idleUpdateState);
-  const compactLogRef = useRef<HTMLDivElement | null>(null);
   const metadataBatchRef = useRef(0);
 
   const existenceKey = useMemo(
@@ -500,12 +532,6 @@ function App() {
   useEffect(() => {
     void refreshPathExistence();
   }, [existenceKey]);
-
-  useEffect(() => {
-    if (compactLogRef.current) {
-      compactLogRef.current.scrollTop = compactLogRef.current.scrollHeight;
-    }
-  }, [log]);
 
   async function loadTelegramSettings() {
     try {
@@ -651,7 +677,13 @@ function App() {
 
     try {
       const results = await invoke<PathExistence[]>("path_existence", { paths });
-      setPathExists(Object.fromEntries(results.map((result) => [result.path, result.exists])));
+      const nextPathExists = Object.fromEntries(results.map((result) => [result.path, result.exists]));
+      setPathExists(nextPathExists);
+      queueMetadataLoading(
+        results
+          .filter((result) => result.exists && !metadataByPath[result.path])
+          .map((result) => result.path),
+      );
     } catch (error) {
       appendLog(`Не удалось проверить output-файлы: ${String(error)}`);
     }
@@ -778,7 +810,7 @@ function App() {
   }
 
   function queueMetadataLoading(paths: string[]) {
-    const pending = uniqueSorted(paths);
+    const pending = uniqueSorted(paths.filter((path) => !metadataByPath[path]));
     const batch = metadataBatchRef.current + 1;
     metadataBatchRef.current = batch;
     if (pending.length === 0) {
@@ -811,6 +843,7 @@ function App() {
       if (metadataBatchRef.current !== batch) {
         return;
       }
+      setMetadataByPath((current) => ({ ...current, [path]: metadata }));
       setRows((current) =>
         current.map((row) =>
           row.path === path ? { ...row, metadata, metadataStatus: "ready" } : row,
@@ -932,7 +965,7 @@ function App() {
 
   return (
     <main className="app bg-main text-main-text">
-      <Panel className="workflowBar">
+      <header className="workflowBar">
         <div className="workflowControls">
           <Button
             className={telegramSettings?.hasBotToken && telegramSettings.hasChatId ? "telegramReady" : ""}
@@ -1073,7 +1106,7 @@ function App() {
             </Button>
           )}
         </div>
-      </Panel>
+      </header>
 
       <Dialog open={telegramOpen} onOpenChange={setTelegramOpen}>
         <DialogContent>
@@ -1188,8 +1221,11 @@ function App() {
               const showsPreviewPath = row.preview || row.telegram;
               const fixedOutputExists = row.fixes && Boolean(pathExists[fixedPath]);
               const previewOutputExists = row.preview && Boolean(pathExists[previewPath]);
+              const fixedPathExists = Boolean(pathExists[fixedPath]);
+              const previewPathExists = Boolean(pathExists[previewPath]);
               const missingPreviewForSend =
                 row.telegram && !row.preview && showsPreviewPath && !pathExists[previewPath];
+              const thumbPath = previewPathExists ? previewPath : row.path;
               const statusLines = [
                 row.fixes && { text: "Fixes", alert: fixedOutputExists },
                 row.preview && { text: "Make Preview", alert: previewOutputExists },
@@ -1198,14 +1234,29 @@ function App() {
                 row.workflowStatus && { text: row.workflowStatus, alert: row.workflowStatus.includes("Ошибка") },
               ].filter(Boolean) as Array<{ text: string; alert: boolean }>;
               const pathLines = [
-                { label: "src", text: row.path, alert: false, active: true, tone: "source" },
-                { label: "fixes", text: fixedPath, alert: fixedOutputExists, active: row.fixes, tone: "fixes" },
+                {
+                  label: "src",
+                  text: row.path,
+                  alert: false,
+                  active: true,
+                  tone: "source",
+                  meta: metadataCells(row.metadata ?? metadataByPath[row.path], true),
+                },
+                {
+                  label: "fixes",
+                  text: fixedPath,
+                  alert: fixedOutputExists,
+                  active: row.fixes || fixedPathExists,
+                  tone: "fixes",
+                  meta: metadataCells(metadataByPath[fixedPath], fixedPathExists),
+                },
                 {
                   label: "preview",
                   text: previewPath,
                   alert: previewOutputExists || missingPreviewForSend,
-                  active: showsPreviewPath,
+                  active: showsPreviewPath || previewPathExists,
                   tone: "preview",
+                  meta: metadataCells(metadataByPath[previewPath], previewPathExists),
                 },
               ];
 
@@ -1222,7 +1273,7 @@ function App() {
                       tone="fixes"
                       onClick={() => updateRow(row.path, { fixes: !row.fixes })}
                     >
-                      <Wrench />
+                      <BugOff />
                     </RowToggle>
                     <RowToggle
                       active={row.preview}
@@ -1244,7 +1295,8 @@ function App() {
                     </RowToggle>
                   </div>
 
-                  <div className="videoThumb" title={fileName(row.path)}>
+                  <div className="videoThumb" title={fileName(thumbPath)}>
+                    <video muted playsInline preload="metadata" src={`${convertFileSrc(thumbPath)}#t=0.1`} />
                     <span>{baseName(row.path).slice(0, 2).toUpperCase()}</span>
                   </div>
 
@@ -1255,14 +1307,11 @@ function App() {
                         <span className={line.alert ? "pathValue alert" : "pathValue"} title={line.text}>
                           {line.text}
                         </span>
+                        <span className="lineMeta">{line.meta[0]}</span>
+                        <span className="lineMeta">{line.meta[1]}</span>
+                        <span className="lineMeta">{line.meta[2]}</span>
                       </div>
                     ))}
-                  </div>
-
-                  <div className="metaStack">
-                    <span>{row.metadataStatus === "ready" && row.metadata ? row.metadata.resolution : "..."}</span>
-                    <span>{options.convertTo25Fps ? "25 fps" : "src fps"}</span>
-                    <span>{row.metadataStatus === "ready" && row.metadata ? `${row.metadata.frames ?? "?"}F` : "..."}</span>
                   </div>
 
                   <div className="statusStack">
@@ -1317,21 +1366,15 @@ function App() {
         </div>
       </Panel>
 
-      <Panel className="logCompact">
-        <div className="logCompactBody" ref={compactLogRef}>
-          {log.slice(-4).map((line, index) => (
-            <div key={`${line}-${index}`}>{line}</div>
-          ))}
-        </div>
-        <Button size="sm" type="button" variant="outline" onClick={openLogWindow}>
-          <List />
-          Логи
-        </Button>
-      </Panel>
-
       <footer className="statusBar">
-        <progress max={100} value={progressPercent} />
-        <span>{progress.total > 0 ? `${progress.completed}/${progress.total}` : statusText}</span>
+        <div className="statusLog">{log.at(-1) ?? statusText}</div>
+        <div className="statusProgress">
+          <span>{progress.total > 0 ? `Прогресс: ${progressPercent}%` : statusText}</span>
+          <progress max={100} value={progressPercent} />
+          <Button aria-label="Открыть логи" size="icon" title="Открыть логи" type="button" variant="outline" onClick={openLogWindow}>
+            <List />
+          </Button>
+        </div>
       </footer>
     </main>
   );

@@ -19,7 +19,9 @@ struct ToolInfo {
 #[derive(Serialize)]
 struct VideoMetadata {
     resolution: String,
+    fps: Option<f64>,
     frames: Option<i64>,
+    duration: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -1443,13 +1445,19 @@ fn parse_metadata(output: &str) -> Result<VideoMetadata, String> {
         _ => "?".to_string(),
     };
 
+    let fps = avg_frame_rate.or(r_frame_rate);
     let frames = nb_frames.or_else(|| {
-        let fps = avg_frame_rate.or(r_frame_rate)?;
+        let fps = fps?;
         let duration = duration?;
         Some((duration * fps).round() as i64)
     });
 
-    Ok(VideoMetadata { resolution, frames })
+    Ok(VideoMetadata {
+        resolution,
+        fps,
+        frames,
+        duration,
+    })
 }
 
 fn parse_frame_rate(value: &str) -> Option<f64> {
