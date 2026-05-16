@@ -2,7 +2,7 @@
 
 Tauri + React desktop prototype for PP18 video workflows.
 
-Current release: `v0.1.6`.
+Current release: `v0.1.7`.
 
 ## Prerequisites
 
@@ -137,9 +137,9 @@ requires an Apple Developer ID certificate and notarization.
 
 ## Current Release Notes
 
-`v0.1.6` is the latest successful release:
+`v0.1.7` is the latest release:
 
-- GitHub release: `https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.6`
+- GitHub release: `https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.7`
 - Windows, macOS arm64, and macOS x64 release jobs passed.
 - Windows `show in folder` now treats successful Explorer launch as success.
 - Windows `open in system player` no longer uses `cmd /C start`.

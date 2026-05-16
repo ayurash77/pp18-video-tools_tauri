@@ -362,6 +362,42 @@ fn folder_files(path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+fn expand_dropped_paths(paths: Vec<String>) -> Result<Vec<String>, String> {
+    let mut files = Vec::new();
+
+    for path in paths {
+        let item_path = Path::new(&path);
+        if item_path.is_file() {
+            files.push(path);
+            continue;
+        }
+
+        if item_path.is_dir() {
+            let mut folder_files = Vec::new();
+            let entries = fs::read_dir(item_path).map_err(|error| {
+                format!("Не удалось прочитать папку {}: {error}", native_path(&path))
+            })?;
+
+            for entry in entries {
+                let entry =
+                    entry.map_err(|error| format!("Не удалось прочитать элемент папки: {error}"))?;
+                let file_type = entry
+                    .file_type()
+                    .map_err(|error| format!("Не удалось определить тип файла: {error}"))?;
+                if file_type.is_file() {
+                    folder_files.push(entry.path().to_string_lossy().to_string());
+                }
+            }
+
+            folder_files.sort_by_key(|path| path.to_lowercase());
+            files.extend(folder_files);
+        }
+    }
+
+    Ok(files)
+}
+
+#[tauri::command]
 async fn run_actions(
     app: AppHandle,
     control: tauri::State<'_, WorkflowControl>,
@@ -1578,6 +1614,7 @@ pub fn run() {
             save_telegram_settings,
             path_existence,
             folder_files,
+            expand_dropped_paths,
             run_actions,
             cancel_actions,
             reveal_in_folder,

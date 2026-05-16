@@ -4,17 +4,20 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
-  Filter,
-  FolderOpen,
-  FolderPlus,
-  List,
-  Play,
-  RotateCw,
-  Settings,
-  Square,
+    BugOff,
+    Eye, FilePlus, FilePlus2, Folder,
+    FolderOpen,
+    FolderPlus, FolderPlusIcon, Folders,
+    LucideFolderPlus,
+    Play,
+    RotateCw,
+    Send,
+    Settings,
+    Square,
+    Trash2,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Checkbox } from "./components/ui/checkbox";
@@ -31,6 +34,9 @@ import { Input } from "./components/ui/input";
 import { Panel } from "./components/ui/panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { VideoTaskCard, type VideoTaskLine } from "./components/VideoTaskCard";
+import { FilterPopoverButton } from "./components/FilterPopoverButton";
+import { StatusFooter } from "./components/StatusFooter";
+import { cn } from "./lib/utils";
 import "./styles.css";
 
 type VideoMetadata = {
@@ -75,6 +81,14 @@ type WorkflowEvent = {
   completed: number;
   total: number;
   output: string | null;
+};
+
+type TauriDragDropPayload = {
+  paths?: string[];
+  position?: {
+    x: number;
+    y: number;
+  };
 };
 
 type TelegramSettingsState = {
@@ -180,6 +194,10 @@ function uniqueSorted(paths: string[]): string[] {
   return Array.from(new Set(paths)).sort((a, b) => a.localeCompare(b, "ru"));
 }
 
+function uniqueInOrder(paths: string[]): string[] {
+  return Array.from(new Set(paths));
+}
+
 type VersionedPath = {
   groupKey: string;
   path: string;
@@ -187,13 +205,14 @@ type VersionedPath = {
 };
 
 function filterLatestVersions(paths: string[]): string[] {
+  const uniquePaths = uniqueInOrder(paths);
   const latest = new Map<string, VersionedPath>();
-  const unversioned: string[] = [];
+  const unversioned = new Set<string>();
 
-  for (const path of paths) {
+  for (const path of uniquePaths) {
     const versioned = parseVersionedPath(path);
     if (!versioned) {
-      unversioned.push(path);
+      unversioned.add(path);
       continue;
     }
 
@@ -203,7 +222,13 @@ function filterLatestVersions(paths: string[]): string[] {
     }
   }
 
-  return uniqueSorted([...unversioned, ...Array.from(latest.values()).map((item) => item.path)]);
+  return uniquePaths.filter((path) => {
+    if (unversioned.has(path)) {
+      return true;
+    }
+    const versioned = parseVersionedPath(path);
+    return Boolean(versioned && latest.get(versioned.groupKey)?.path === path);
+  });
 }
 
 function parseVersionedPath(path: string): VersionedPath | null {
@@ -258,7 +283,7 @@ function metadataCells(metadata: VideoMetadata | undefined, available: boolean):
   if (!available || !metadata) {
     return ["---", "---", "---"];
   }
-  return [metadata.resolution || "---", formatFps(metadata.fps), formatDuration(metadata.duration)];
+  return [metadata.resolution || "---", formatFps(metadata.fps), metadata.frames ? `${metadata.frames}F` : "---"];
 }
 
 function readStoredLog(): string[] {
@@ -437,9 +462,11 @@ function App() {
   const [telegramSettings, setTelegramSettings] = useState<TelegramSettingsState | null>(null);
   const [telegramDraft, setTelegramDraft] = useState({ botToken: "", chatId: "" });
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [dropActive, setDropActive] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>(idleUpdateState);
   const metadataBatchRef = useRef(0);
   const thumbnailBatchRef = useRef(0);
+  const dropZoneRef = useRef<HTMLDivElement | null>(null);
 
   const existenceKey = useMemo(
     () => rows.map((row) => `${row.path}|${row.fixes}|${row.preview}|${row.telegram}`).join("\n"),
@@ -666,14 +693,24 @@ function App() {
       const results = await invoke<PathExistence[]>("path_existence", { paths });
       const nextPathExists = Object.fromEntries(results.map((result) => [result.path, result.exists]));
       setPathExists(nextPathExists);
-      queueMetadataLoading(
-        results
-          .filter((result) => result.exists && !metadataByPath[result.path])
-          .map((result) => result.path),
-      );
+      queueMetadataLoading(metadataPathsForRows(rows, nextPathExists));
     } catch (error) {
       appendLog(`Не удалось проверить output-файлы: ${String(error)}`);
     }
+  }
+
+  function metadataPathsForRows(currentRows: VideoRow[], existingPaths: Record<string, boolean>) {
+    return uniqueSorted(
+      currentRows.flatMap((row) => {
+        const fixedPath = makeFixedPath(row.path);
+        const previewPath = makePreviewPath(row.fixes ? fixedPath : row.path);
+        return [
+          row.path,
+          existingPaths[fixedPath] ? fixedPath : null,
+          existingPaths[previewPath] ? previewPath : null,
+        ].filter(Boolean) as string[];
+      }),
+    );
   }
 
   async function chooseFiles() {
@@ -730,10 +767,131 @@ function App() {
     }
   }
 
-  function buildRows(paths: string[], latestVersionsOnly: boolean): VideoRow[] {
-    const allVideos = uniqueSorted(paths.filter(isVideoPath));
+  function droppedPaths(event: React.DragEvent<HTMLElement>): string[] {
+    const files = Array.from(event.dataTransfer.files);
+    return uniqueInOrder(
+      files
+        .map((file) => {
+          const droppedFile = file as File & { path?: string };
+          return droppedFile.path ?? "";
+        })
+        .filter(Boolean),
+    );
+  }
+
+  async function addDroppedPaths(paths: string[]) {
+    if (running || paths.length === 0) {
+      return;
+    }
+
+    setStatusText(`Добавление перетаскиванием: ${paths.length}`);
+    try {
+      const expandedPaths = await invoke<string[]>("expand_dropped_paths", { paths });
+      applyVideoPaths(expandedPaths, "Перетащено видеофайлов");
+    } catch (error) {
+      appendLog(`Drag-and-drop: не удалось добавить файлы: ${String(error)}`);
+      setStatusText("Ошибка добавления файлов");
+    }
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropActive(false);
+
+    const paths = droppedPaths(event);
+    if (paths.length === 0) {
+      appendLog("Drag-and-drop: приложение не получило пути файлов.");
+      return;
+    }
+
+    void addDroppedPaths(paths);
+  }
+
+  function isInDropZone(position: TauriDragDropPayload["position"]) {
+    const element = dropZoneRef.current;
+    if (!element || !position) {
+      return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const candidates = [
+      { x: position.x, y: position.y },
+      { x: position.x / dpr, y: position.y / dpr },
+    ];
+
+    return candidates.some(
+      ({ x, y }) => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom,
+    );
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    const unlisteners: Array<() => void> = [];
+
+    async function attachDragListeners() {
+      const dragEnterUnlisten = await listen<TauriDragDropPayload>(
+        TauriEvent.DRAG_ENTER,
+        (event) => {
+          if (!running && isInDropZone(event.payload.position)) {
+            setDropActive(true);
+          }
+        },
+      );
+      const dragOverUnlisten = await listen<TauriDragDropPayload>(
+        TauriEvent.DRAG_OVER,
+        (event) => {
+          if (!running && isInDropZone(event.payload.position)) {
+            setDropActive(true);
+          } else {
+            setDropActive(false);
+          }
+        },
+      );
+      const dragLeaveUnlisten = await listen<void>(TauriEvent.DRAG_LEAVE, () => {
+        setDropActive(false);
+      });
+      const dragDropUnlisten = await listen<TauriDragDropPayload>(
+        TauriEvent.DRAG_DROP,
+        (event) => {
+          setDropActive(false);
+          if (running || !isInDropZone(event.payload.position)) {
+            return;
+          }
+
+          const paths = event.payload.paths ?? [];
+          if (paths.length === 0) {
+            appendLog("Drag-and-drop: Tauri не передал пути файлов.");
+            return;
+          }
+
+          void addDroppedPaths(paths);
+        },
+      );
+
+      unlisteners.push(dragEnterUnlisten, dragOverUnlisten, dragLeaveUnlisten, dragDropUnlisten);
+      if (cancelled) {
+        while (unlisteners.length > 0) {
+          unlisteners.pop()?.();
+        }
+      }
+    }
+
+    void attachDragListeners();
+
+    return () => {
+      cancelled = true;
+      while (unlisteners.length > 0) {
+        unlisteners.pop()?.();
+      }
+    };
+  }, [running, sourcePaths, rows, options.latestVersionsOnly]);
+
+  function buildRows(paths: string[], latestVersionsOnly: boolean, currentRows = rows): VideoRow[] {
+    const allVideos = uniqueInOrder(paths.filter(isVideoPath));
     const videos = latestVersionsOnly ? filterLatestVersions(allVideos) : allVideos;
-    const existingRows = new Map(rows.map((row) => [row.path, row]));
+    const existingRows = new Map(currentRows.map((row) => [row.path, row]));
     return videos.map((path) => ({
       ...existingRows.get(path),
       id: path,
@@ -747,26 +905,45 @@ function App() {
   }
 
   function applyVideoPaths(paths: string[], logPrefix: string) {
-    const allVideos = uniqueSorted(paths.filter(isVideoPath));
-    const videos = options.latestVersionsOnly ? filterLatestVersions(allVideos) : allVideos;
-    setSourcePaths(allVideos);
-    const nextRows: VideoRow[] = videos.map((path) => ({
-      id: path,
-      path,
-      fixes: false,
-      preview: true,
-      telegram: true,
-      metadataStatus: "loading",
-    }));
+    const incomingVideos = uniqueInOrder(paths.filter(isVideoPath));
+    const existingSources = new Set(sourcePaths);
+    const newVideos = incomingVideos.filter((path) => !existingSources.has(path));
+    const duplicateCount = incomingVideos.length - newVideos.length;
+    const nextSourcePaths = uniqueInOrder([...sourcePaths, ...newVideos]);
+    const nextRows = buildRows(nextSourcePaths, options.latestVersionsOnly).map((row) =>
+      !row.metadata && row.metadataStatus === "idle" ? { ...row, metadataStatus: "loading" as const } : row,
+    );
 
+    setSourcePaths(nextSourcePaths);
     setRows(nextRows);
     setStatusText(nextRows.length ? `Всего файлов: ${nextRows.length}` : "Файлы не выбраны");
+
+    const hidden = nextSourcePaths.length - nextRows.length;
+    const details = [
+      `добавлено: ${newVideos.length}`,
+      duplicateCount > 0 ? `пропущено дублей: ${duplicateCount}` : null,
+      options.latestVersionsOnly && hidden > 0 ? `скрыто старых версий: ${hidden}` : null,
+    ].filter(Boolean);
+
     appendLog(
-      options.latestVersionsOnly && allVideos.length !== videos.length
-        ? `${logPrefix}: ${nextRows.length}; скрыто старых версий: ${allVideos.length - videos.length}`
-        : `${logPrefix}: ${nextRows.length}`,
+      details.length > 0
+        ? `${logPrefix}: ${incomingVideos.length}; ${details.join("; ")}; всего в списке: ${nextRows.length}`
+        : `${logPrefix}: 0; всего в списке: ${nextRows.length}`,
     );
-    queueMetadataLoading(nextRows.map((row) => row.path));
+    queueMetadataLoading(
+      nextRows
+        .filter((row) => row.metadataStatus === "loading" && !row.metadata)
+        .map((row) => row.path),
+    );
+  }
+
+  function clearVideoList() {
+    setRows([]);
+    setSourcePaths([]);
+    setPathExists({});
+    setProgress({ completed: 0, total: 0 });
+    setStatusText("Файлы не выбраны");
+    appendLog("Список файлов очищен.");
   }
 
   function setLatestVersionsOnly(latestVersionsOnly: boolean) {
@@ -900,21 +1077,65 @@ function App() {
   }
 
   function removeRow(path: string) {
-    setRows((current) => current.filter((row) => row.path !== path));
+    const nextSourcePaths = sourcePaths.filter((sourcePath) => sourcePath !== path);
+    const remainingRows = rows.filter((row) => row.path !== path);
+    const nextRows = buildRows(nextSourcePaths, options.latestVersionsOnly, remainingRows).map((row) =>
+      !row.metadata && row.metadataStatus === "idle" ? { ...row, metadataStatus: "loading" as const } : row,
+    );
+
+    setSourcePaths(nextSourcePaths);
+    setRows(nextRows);
+    setProgress({ completed: 0, total: 0 });
+    setStatusText(nextRows.length ? `Всего файлов: ${nextRows.length}` : "Файлы не выбраны");
+    appendLog(`Убрано из списка: ${fileName(path)}; всего в списке: ${nextRows.length}`);
+    queueMetadataLoading(
+      nextRows
+        .filter((row) => row.metadataStatus === "loading" && !row.metadata)
+        .map((row) => row.path),
+    );
   }
 
   async function runSelectedActions() {
+    await runRows(rows, {
+      emptyMessage: "Запуск отменен: файлы не выбраны.",
+      emptyStatus: "Файлы не выбраны",
+      noActionsMessage: "Запуск отменен: действия в списке не выбраны.",
+      noActionsStatus: "Нет выбранных действий",
+      resetAllStatuses: true,
+    });
+  }
+
+  async function runRow(row: VideoRow) {
+    await runRows([row], {
+      emptyMessage: "Запуск отменен: файл не найден в списке.",
+      emptyStatus: "Файл не найден",
+      noActionsMessage: `Запуск отменен: действия для ${fileName(row.path)} не выбраны.`,
+      noActionsStatus: "Нет выбранных действий",
+      resetAllStatuses: false,
+    });
+  }
+
+  async function runRows(
+    targetRows: VideoRow[],
+    messages: {
+      emptyMessage: string;
+      emptyStatus: string;
+      noActionsMessage: string;
+      noActionsStatus: string;
+      resetAllStatuses: boolean;
+    },
+  ) {
     if (running) {
       return;
     }
-    if (rows.length === 0) {
-      appendLog("Запуск отменен: файлы не выбраны.");
-      setStatusText("Файлы не выбраны");
+    if (targetRows.length === 0) {
+      appendLog(messages.emptyMessage);
+      setStatusText(messages.emptyStatus);
       return;
     }
-    if (!rows.some((row) => row.fixes || row.preview || row.telegram)) {
-      appendLog("Запуск отменен: действия в списке не выбраны.");
-      setStatusText("Нет выбранных действий");
+    if (!targetRows.some((row) => row.fixes || row.preview || row.telegram)) {
+      appendLog(messages.noActionsMessage);
+      setStatusText(messages.noActionsStatus);
       return;
     }
 
@@ -922,13 +1143,21 @@ function App() {
     setCancelling(false);
     setProgress({ completed: 0, total: 0 });
     setStatusText("Запуск...");
-    setRows((current) => current.map((row) => ({ ...row, workflowStatus: undefined })));
-    appendLog(processingSummary());
+    setRows((current) =>
+      messages.resetAllStatuses
+        ? current.map((row) => ({ ...row, workflowStatus: undefined }))
+        : current.map((row) =>
+            targetRows.some((target) => target.id === row.id)
+              ? { ...row, workflowStatus: undefined }
+              : row,
+          ),
+    );
+    appendLog(processingSummary(targetRows.length));
 
     try {
       await invoke("run_actions", {
         request: {
-          rows: rows.map(({ id, path, fixes, preview, telegram }) => ({
+          rows: targetRows.map(({ id, path, fixes, preview, telegram }) => ({
             id,
             path,
             fixes,
@@ -948,6 +1177,16 @@ function App() {
     }
   }
 
+  function toggleRowsColumn(column: "fixes" | "preview" | "telegram") {
+    if (rows.length === 0 || running) {
+      return;
+    }
+    const nextValue = rows.some((row) => !row[column]);
+    setRows((current) =>
+      current.map((row) => ({ ...row, workflowStatus: undefined, [column]: nextValue })),
+    );
+  }
+
   async function cancelCurrentRun() {
     if (!running || cancelling) {
       return;
@@ -964,7 +1203,7 @@ function App() {
     }
   }
 
-  function processingSummary(): string {
+  function processingSummary(rowCount = rows.length): string {
     const duplicateMode = options.removeDupes ? duplicateModeLabels[options.duplicateMode] : "нет";
     const fpsMode = options.convertTo25Fps
       ? "25 fps"
@@ -973,7 +1212,7 @@ function App() {
         : "без видео-фильтра";
     const existingMode =
       options.existingMode === "overwrite" ? "перезаписывать" : "пропускать";
-    return `Настройки: выбрано файлов: ${rows.length}; дубли: ${duplicateMode}; тайминг: ${fpsMode}; существующие: ${existingMode}.`;
+    return `Настройки: выбрано файлов: ${rowCount}; дубли: ${duplicateMode}; тайминг: ${fpsMode}; существующие: ${existingMode}.`;
   }
 
   async function reveal(path: string) {
@@ -993,6 +1232,9 @@ function App() {
   }
 
   const progressPercent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+  const allFixesEnabled = rows.length > 0 && rows.every((row) => row.fixes);
+  const allPreviewEnabled = rows.length > 0 && rows.every((row) => row.preview);
+  const allTelegramEnabled = rows.length > 0 && rows.every((row) => row.telegram);
 
   return (
     <main className="app bg-main text-main-text">
@@ -1008,15 +1250,46 @@ function App() {
           >
             <Settings />
           </Button>
-          <span className="toolbarDivider" />
-          <label>
-            <Checkbox
-              checked={options.latestVersionsOnly}
-              disabled={running}
-              onCheckedChange={(checked) => setLatestVersionsOnly(checked === true)}
-            />
-            Последние версии
-          </label>
+
+            <Button
+                aria-label="Fixes для всех"
+                aria-pressed={allFixesEnabled}
+                className={allFixesEnabled ? "toolbarActive" : ""}
+                disabled={running || rows.length === 0}
+                size="icon"
+                title="Fixes для всех"
+                type="button"
+                variant={allFixesEnabled ? "secondary" : "outline"}
+                onClick={() => toggleRowsColumn("fixes")}
+            >
+                <BugOff />
+            </Button>
+            <Button
+                aria-label="Preview для всех"
+                aria-pressed={allPreviewEnabled}
+                className={allPreviewEnabled ? "toolbarActive" : ""}
+                disabled={running || rows.length === 0}
+                size="icon"
+                title="Preview для всех"
+                type="button"
+                variant={allPreviewEnabled ? "secondary" : "outline"}
+                onClick={() => toggleRowsColumn("preview")}
+            >
+                <Eye />
+            </Button>
+            <Button
+                aria-label="TG для всех"
+                aria-pressed={allTelegramEnabled}
+                className={allTelegramEnabled ? "toolbarActive" : ""}
+                disabled={running || rows.length === 0}
+                size="icon"
+                title="TG для всех"
+                type="button"
+                variant={allTelegramEnabled ? "secondary" : "outline"}
+                onClick={() => toggleRowsColumn("telegram")}
+            >
+                <Send />
+            </Button>
           <span className="toolbarDivider" />
           <label>
             <Checkbox
@@ -1082,28 +1355,36 @@ function App() {
         </div>
         <div className="workflowActions">
           <Button
-            aria-label="Проверить обновления"
+            aria-label="Очистить список"
+            disabled={running || rows.length === 0}
             size="icon"
-            title="Проверить обновления"
+            title="Очистить список"
             type="button"
             variant="outline"
-            onClick={checkForAppUpdate}
+            onClick={clearVideoList}
           >
-            <RotateCw />
+            <Trash2 />
           </Button>
-          <Button
-            aria-label="Последние версии"
-            aria-pressed={options.latestVersionsOnly}
-            className={options.latestVersionsOnly ? "toolbarActive" : ""}
-            disabled={running}
-            size="icon"
-            title="Последние версии"
-            type="button"
-            variant="outline"
-            onClick={() => setLatestVersionsOnly(!options.latestVersionsOnly)}
-          >
-            <Filter />
-          </Button>
+          <FilterPopoverButton
+            active={options.latestVersionsOnly}
+            label="Фильтры"
+            groups={[
+              {
+                title: "Файлы",
+                options: [
+                  {
+                    value: "latestVersionsOnly",
+                    label: "Последние версии",
+                    checked: options.latestVersionsOnly,
+                    onChange: setLatestVersionsOnly,
+                  },
+                ],
+              },
+            ]}
+            resetLabel="Сбросить"
+            onReset={() => setLatestVersionsOnly(false)}
+          />
+
           <Button
             aria-label="Выбрать файлы"
             disabled={running}
@@ -1113,7 +1394,7 @@ function App() {
             variant="default"
             onClick={chooseFiles}
           >
-            <FolderOpen />
+            <FilePlus2  />
           </Button>
           <Button
             aria-label="Выбрать папки"
@@ -1132,7 +1413,7 @@ function App() {
               {cancelling ? "Остановка" : "Остановить"}
             </Button>
           ) : (
-            <Button disabled={rows.length === 0} type="button" onClick={runSelectedActions}>
+            <Button disabled={rows.length === 0} type="button" variant={"destructive"} onClick={runSelectedActions}>
               <Play />
               Запустить
             </Button>
@@ -1141,40 +1422,69 @@ function App() {
       </header>
 
       <Dialog open={telegramOpen} onOpenChange={setTelegramOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Настройки Telegram</DialogTitle>
+        <DialogContent
+          className="w-full max-w-3xl max-h-[85vh] overflow-y-auto"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+        >
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-2xl font-titillium font-bold">Настройки</DialogTitle>
             <DialogDescription>
-              Токен бота и chat id сохраняются локально в настройках приложения.
+              Настройки приложения сохраняются локально на этой машине.
             </DialogDescription>
           </DialogHeader>
-          <div className="dialogForm">
-            <label>
-              <span>Bot token</span>
-              <Input
-                autoComplete="off"
-                onChange={(event) => {
-                  const botToken = event.currentTarget.value;
-                  setTelegramDraft((current) => ({ ...current, botToken }));
-                }}
-                placeholder="123456:ABC..."
-                type="password"
-                value={telegramDraft.botToken}
-              />
-            </label>
-            <label>
-              <span>Chat ID</span>
-              <Input
-                autoComplete="off"
-                onChange={(event) => {
-                  const chatId = event.currentTarget.value;
-                  setTelegramDraft((current) => ({ ...current, chatId }));
-                }}
-                placeholder="-100..."
-                value={telegramDraft.chatId}
-              />
-            </label>
+
+          <div className="settingsSections">
+            <section className="settingsGroup">
+              <div className="settingsGroupTitle">Основные</div>
+              <div className="settingsRow">
+                <div>
+                  <div className="settingsRowTitle">Обновления</div>
+                  <div className="settingsRowDescription">
+                    Проверить наличие новой версии приложения.
+                  </div>
+                </div>
+                <Button type="button" variant="outline" onClick={checkForAppUpdate}>
+                  <RotateCw />
+                  Проверить
+                </Button>
+              </div>
+            </section>
+
+            <section className="settingsGroup">
+              <div className="settingsGroupTitle">Телеграмм</div>
+              <div className="settingsHint">
+                Токен бота и chat id используются для пересылки готовых файлов в Telegram.
+              </div>
+              <div className="dialogForm">
+                <label>
+                  <span>Bot token</span>
+                  <Input
+                    autoComplete="off"
+                    onChange={(event) => {
+                      const botToken = event.currentTarget.value;
+                      setTelegramDraft((current) => ({ ...current, botToken }));
+                    }}
+                    placeholder="123456:ABC..."
+                    type="password"
+                    value={telegramDraft.botToken}
+                  />
+                </label>
+                <label>
+                  <span>Chat ID</span>
+                  <Input
+                    autoComplete="off"
+                    onChange={(event) => {
+                      const chatId = event.currentTarget.value;
+                      setTelegramDraft((current) => ({ ...current, chatId }));
+                    }}
+                    placeholder="-100..."
+                    value={telegramDraft.chatId}
+                  />
+                </label>
+              </div>
+            </section>
           </div>
+
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
@@ -1241,7 +1551,36 @@ function App() {
         </DialogContent>
       </Dialog>
 
-      <Panel className="tableWrap">
+      <Panel
+        className={cn(
+          "tableWrap transition-[border-color,box-shadow,background-color]",
+          dropActive &&
+            "border-(--ring) bg-[color-mix(in_oklch,var(--ring),transparent_92%)] shadow-[0_0_0_2px_color-mix(in_oklch,var(--ring),transparent_55%)]",
+        )}
+        ref={dropZoneRef}
+        onDragEnter={(event) => {
+          if (running || !event.dataTransfer.types.includes("Files")) {
+            return;
+          }
+          event.preventDefault();
+          setDropActive(true);
+        }}
+        onDragLeave={(event) => {
+          if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            return;
+          }
+          setDropActive(false);
+        }}
+        onDragOver={(event) => {
+          if (running || !event.dataTransfer.types.includes("Files")) {
+            return;
+          }
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          setDropActive(true);
+        }}
+        onDrop={handleDrop}
+      >
         <div className="batchList">
           {rows.length === 0 ? (
             <div className="empty">Файлы не выбраны</div>
@@ -1251,8 +1590,6 @@ function App() {
               const previewInput = row.fixes ? fixedPath : row.path;
               const previewPath = makePreviewPath(previewInput);
               const showsPreviewPath = row.preview || row.telegram;
-              const fixedOutputExists = row.fixes && Boolean(pathExists[fixedPath]);
-              const previewOutputExists = row.preview && Boolean(pathExists[previewPath]);
               const fixedPathExists = Boolean(pathExists[fixedPath]);
               const previewPathExists = Boolean(pathExists[previewPath]);
               const missingPreviewForSend =
@@ -1271,7 +1608,7 @@ function App() {
                 {
                   label: "fixes",
                   text: fixedPath,
-                  alert: fixedOutputExists,
+                  alert: fixedPathExists,
                   active: row.fixes || fixedPathExists,
                   tone: "fixes",
                   meta: metadataCells(metadataByPath[fixedPath], fixedPathExists),
@@ -1279,7 +1616,7 @@ function App() {
                 {
                   label: "preview",
                   text: previewPath,
-                  alert: previewOutputExists || missingPreviewForSend,
+                  alert: previewPathExists || missingPreviewForSend,
                   active: showsPreviewPath || previewPathExists,
                   tone: "preview",
                   meta: metadataCells(metadataByPath[previewPath], previewPathExists),
@@ -1298,6 +1635,7 @@ function App() {
                   onOpen={() => openInSystem(row.path)}
                   onRemove={() => removeRow(row.path)}
                   onReveal={() => reveal(row.path)}
+                  onRun={() => runRow(row)}
                   onToggleFixes={() => updateRow(row.path, { fixes: !row.fixes })}
                   onTogglePreview={() => updateRow(row.path, { preview: !row.preview })}
                   onToggleTelegram={() => updateRow(row.path, { telegram: !row.telegram })}
@@ -1308,16 +1646,13 @@ function App() {
         </div>
       </Panel>
 
-      <footer className="statusBar">
-        <div className="statusLog">{log.at(-1) ?? statusText}</div>
-        <div className="statusProgress">
-          <span>{progress.total > 0 ? `Прогресс: ${progressPercent}%` : statusText}</span>
-          <progress max={100} value={progressPercent} />
-          <Button aria-label="Открыть логи" size="icon" title="Открыть логи" type="button" variant="outline" onClick={openLogWindow}>
-            <List />
-          </Button>
-        </div>
-      </footer>
+      <StatusFooter
+        latestLog={log.at(-1)}
+        progressPercent={progressPercent}
+        statusText={statusText}
+        total={progress.total}
+        onOpenLogs={openLogWindow}
+      />
     </main>
   );
 }
@@ -1325,6 +1660,12 @@ function App() {
 function LogWindow() {
   const [lines, setLines] = useState<string[]>(() => readStoredLog());
   const bodyRef = useRef<HTMLElement | null>(null);
+  const autoScrollRef = useRef(true);
+
+  function updateAutoScrollState(element: HTMLElement) {
+    const distanceToBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    autoScrollRef.current = distanceToBottom < 24;
+  }
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -1342,7 +1683,7 @@ function LogWindow() {
   }, []);
 
   useEffect(() => {
-    if (bodyRef.current) {
+    if (bodyRef.current && autoScrollRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
     }
   }, [lines]);
@@ -1353,7 +1694,11 @@ function LogWindow() {
         <h1>PP18 Video Tools Log</h1>
         <span>{lines.length}</span>
       </header>
-      <section className="logWindowBody" ref={bodyRef}>
+      <section
+        className="logWindowBody"
+        ref={bodyRef}
+        onScroll={(event) => updateAutoScrollState(event.currentTarget)}
+      >
         {lines.length === 0 ? (
           <div className="empty">Лог пуст</div>
         ) : (

@@ -38,7 +38,10 @@
   --background: oklch(0.245 0.014 268);
   --foreground: oklch(0.9 0.03 270);
   --card: oklch(0.3 0.02 270);
+  --popover: oklch(0.23 0.014 275);
+  --popover-foreground: oklch(0.985 0 0);
   --card-bright: color-mix(in oklch, var(--card), var(--muted-foreground) 12%);
+  --card-foreground: oklch(0.985 0 0);
   --card-soft: color-mix(in oklch, var(--card), transparent 18%);
   --muted: oklch(0.28 0.02 270);
   --muted-foreground: oklch(0.65 0.04 275);
@@ -49,6 +52,7 @@
   --accent: oklch(0.38 0.02 270 / 0.75);
   --accent-foreground: oklch(1 0 0);
   --destructive: oklch(0.5 0.2 18);
+  --destructive-bright: oklch(0.6 0.25 18);
   --destructive-foreground: oklch(1 0.12 20);
   --warning-fg: oklch(0.95 0.33 20);
   --border: oklch(0.32 0.022 275);
@@ -78,8 +82,35 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-bright: color-mix(in oklch, var(--card), var(--muted-foreground) 12%);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-bright: var(--destructive-bright);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-bright: color-mix(in oklch, var(--border), var(--muted-foreground) 10%);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
 * {
   box-sizing: border-box;
+  border-color: var(--border);
+  outline-color: transparent;
 }
 
 html,
@@ -118,7 +149,6 @@ body {
   background: var(--scrollbar-hover);
 }
 
-button:not(.ui-checkbox):not(.video-icon-toggle),
 select {
   border: 1px solid color-mix(in oklch, var(--muted-foreground), transparent 80%);
   border-radius: 6px;
@@ -140,24 +170,16 @@ select {
     transform 150ms ease;
 }
 
-button:not(.ui-checkbox):not(.video-icon-toggle):hover,
 select:hover {
   background: var(--accent);
   color: var(--accent-foreground);
 }
 
-button:not(.ui-checkbox):not(.video-icon-toggle):active {
-  opacity: 0.72;
-  transform: scale(0.98);
-}
-
-button:not(.ui-checkbox):not(.video-icon-toggle):focus-visible,
 select:focus-visible {
   border-color: var(--ring);
   box-shadow: var(--focus-shadow);
 }
 
-button:not(.ui-checkbox):not(.video-icon-toggle):disabled,
 select:disabled,
 input:disabled {
   cursor: not-allowed;
@@ -221,7 +243,7 @@ input:disabled {
   background: var(--background);
   display: grid;
   gap: 0;
-  grid-template-rows: 52px minmax(0, 1fr) 28px;
+  grid-template-rows: 52px minmax(0, 1fr) auto;
   height: 100%;
   min-width: 980px;
   overflow: hidden;
@@ -402,9 +424,57 @@ input:disabled {
 }
 
 .toolbarActive {
-  border-color: color-mix(in oklch, var(--ring), transparent 20%);
   color: var(--secondary-foreground);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring), transparent 72%);
+}
+
+.settingsSections {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.settingsGroup {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: none;
+  color: var(--foreground);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.settingsGroupTitle {
+  align-self: flex-start;
+  background: var(--border);
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-top: -37px;
+  padding: 2px 8px;
+}
+
+.settingsRow {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.settingsRowTitle {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settingsHint,
+.settingsRowDescription {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 h1 {
@@ -661,64 +731,6 @@ td:nth-child(3) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.statusBar {
-  align-items: center;
-  background: color-mix(in oklch, var(--background), black 6%);
-  border-top: 1px solid color-mix(in oklch, var(--border), transparent 45%);
-  display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 28px;
-  min-width: 0;
-  padding: 0 14px;
-}
-
-.statusLog {
-  color: color-mix(in oklch, var(--muted-foreground), white 8%);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.statusProgress {
-  align-items: center;
-  display: grid;
-  gap: 9px;
-  grid-template-columns: auto 112px 30px;
-  min-width: 0;
-}
-
-.statusBar progress {
-  appearance: none;
-  background: color-mix(in oklch, var(--muted), transparent 20%);
-  border: 0;
-  border-radius: 999px;
-  height: 5px;
-  overflow: hidden;
-  width: 100%;
-}
-
-.statusBar progress::-webkit-progress-bar {
-  background: color-mix(in oklch, var(--muted), transparent 20%);
-  border-radius: 999px;
-}
-
-.statusBar progress::-webkit-progress-value {
-  background: linear-gradient(90deg, oklch(0.68 0.2 252), oklch(0.7 0.18 285));
-  border-radius: 999px;
-}
-
-.statusBar span {
-  color: color-mix(in oklch, var(--muted-foreground), white 12%);
-  font-size: 11px;
-  font-weight: 700;
-  min-width: 92px;
-  text-align: right;
 }
 
 .logWindow {

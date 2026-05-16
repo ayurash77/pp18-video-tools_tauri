@@ -1,6 +1,6 @@
 [package]
 name = "pp18-video-tools-tauri"
-version = "0.1.6"
+version = "0.1.7"
 description = "PP18 Video Tools desktop app"
 authors = ["PP18"]
 edition = "2021"

@@ -35,7 +35,7 @@ Current branch/tag state when this file was updated:
 ```text
 main
 HEAD 7deb7d5 Fix Windows release build
-latest successful release v0.1.6
+latest release v0.1.7
 ```
 
 `v0.1.5` exists as an intermediate failed release attempt. Do not use it as the
@@ -325,11 +325,11 @@ updater endpoint is:
 https://github.com/ayurash77/pp18-video-tools_tauri/releases/latest/download/latest.json
 ```
 
-Latest successful release at handoff time:
+Latest release at handoff time:
 
 ```text
-v0.1.6
-https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.6
+v0.1.7
+https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.7
 ```
 
 Assets in `v0.1.6` include:
