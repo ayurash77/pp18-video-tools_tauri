@@ -212,33 +212,67 @@ fn video_thumbnail(app: AppHandle, path: String) -> Result<String, String> {
     path.hash(&mut hasher);
     let output_path = cache_dir.join(format!("{:016x}.jpg", hasher.finish()));
     if output_path.is_file() {
-        return image_data_url(&output_path);
+        if is_valid_jpeg(&output_path) {
+            return image_data_url(&output_path);
+        }
+        let _ = fs::remove_file(&output_path);
     }
 
     let output_string = output_path.to_string_lossy().to_string();
+    let temp_path = output_path.with_extension("jpg.tmp");
+    let temp_string = temp_path.to_string_lossy().to_string();
+    let _ = fs::remove_file(&temp_path);
+
     let output = Command::new(ffmpeg)
         .args([
             "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
             "-ss",
-            "00:00:01",
+            "0.2",
             "-i",
             &path,
+            "-an",
             "-frames:v",
             "1",
             "-vf",
             "scale=424:240:force_original_aspect_ratio=increase,crop=424:240",
             "-q:v",
             "3",
-            &output_string,
+            "-f",
+            "image2",
+            &temp_string,
         ])
         .output()
         .map_err(|error| error.to_string())?;
 
     if !output.status.success() {
+        let _ = fs::remove_file(&temp_path);
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
 
+    if !is_valid_jpeg(&temp_path) {
+        let _ = fs::remove_file(&temp_path);
+        return Err("ffmpeg не создал корректный thumbnail".to_string());
+    }
+
+    fs::rename(&temp_path, &output_path)
+        .map_err(|error| format!("Не удалось сохранить thumbnail {output_string}: {error}"))?;
+
     image_data_url(&output_path)
+}
+
+fn is_valid_jpeg(path: &Path) -> bool {
+    let Ok(bytes) = fs::read(path) else {
+        return false;
+    };
+
+    bytes.len() > 4
+        && bytes.first() == Some(&0xff)
+        && bytes.get(1) == Some(&0xd8)
+        && bytes.get(bytes.len() - 2) == Some(&0xff)
+        && bytes.last() == Some(&0xd9)
 }
 
 fn image_data_url(path: &Path) -> Result<String, String> {
