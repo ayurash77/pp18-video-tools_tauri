@@ -6,7 +6,21 @@ import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updat
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { ExternalLink, FolderOpen, FolderPlus, List, Play, Settings, Square, X } from "lucide-react";
+import {
+  ExternalLink,
+  Eye,
+  Filter,
+  FolderOpen,
+  FolderPlus,
+  List,
+  Play,
+  RotateCw,
+  Send,
+  Settings,
+  Square,
+  Trash2,
+  Wrench,
+} from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Checkbox } from "./components/ui/checkbox";
 import {
@@ -21,7 +35,6 @@ import {
 import { Input } from "./components/ui/input";
 import { Panel } from "./components/ui/panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import "./styles.css";
 
 type VideoMetadata = {
@@ -379,6 +392,31 @@ function statusFromEvent(event: WorkflowEvent): string | undefined {
     if (event.status === "skipped") return "TG пропущен";
   }
   return undefined;
+}
+
+type RowToggleProps = {
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+  tone: "fixes" | "preview" | "telegram";
+  children: React.ReactNode;
+};
+
+function RowToggle({ active, disabled, label, onClick, tone, children }: RowToggleProps) {
+  return (
+    <button
+      aria-label={label}
+      aria-pressed={active}
+      className={`rowToggle ${tone}`}
+      disabled={disabled}
+      title={label}
+      type="button"
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
 }
 
 function App() {
@@ -801,13 +839,6 @@ function App() {
     setRows((current) => current.filter((row) => row.path !== path));
   }
 
-  function toggleColumn(column: "fixes" | "preview" | "telegram") {
-    const hasUnchecked = rows.some((row) => !row[column]);
-    setRows((current) =>
-      current.map((row) => ({ ...row, workflowStatus: undefined, [column]: hasUnchecked })),
-    );
-  }
-
   async function runSelectedActions() {
     if (running) {
       return;
@@ -911,8 +942,8 @@ function App() {
             onClick={() => setTelegramOpen(true)}
           >
             <Settings />
-            Telegram
           </Button>
+          <span className="toolbarDivider" />
           <label>
             <Checkbox
               checked={options.latestVersionsOnly}
@@ -921,6 +952,7 @@ function App() {
             />
             Последние версии
           </label>
+          <span className="toolbarDivider" />
           <label>
             <Checkbox
               checked={options.removeDupes}
@@ -961,7 +993,7 @@ function App() {
                 setOptions((current) => ({ ...current, convertTo25Fps: checked === true }));
               }}
             />
-            25 fps без добавления кадров
+            25 fps
           </label>
           <Select
             disabled={running}
@@ -985,23 +1017,46 @@ function App() {
         </div>
         <div className="workflowActions">
           <Button
+            aria-label="Проверить обновления"
+            size="icon"
+            title="Проверить обновления"
+            type="button"
+            variant="outline"
+            onClick={checkForAppUpdate}
+          >
+            <RotateCw />
+          </Button>
+          <Button
+            aria-label="Последние версии"
+            aria-pressed={options.latestVersionsOnly}
+            className={options.latestVersionsOnly ? "toolbarActive" : ""}
+            disabled={running}
+            size="icon"
+            title="Последние версии"
+            type="button"
+            variant="outline"
+            onClick={() => setLatestVersionsOnly(!options.latestVersionsOnly)}
+          >
+            <Filter />
+          </Button>
+          <Button
             aria-label="Выбрать файлы"
             disabled={running}
             size="icon"
             title="Выбрать файлы"
             type="button"
-            variant="outline"
+            variant="default"
             onClick={chooseFiles}
           >
             <FolderOpen />
           </Button>
           <Button
-            aria-label="Выбрать папку"
+            aria-label="Выбрать папки"
             disabled={running}
             size="icon"
-            title="Выбрать папку"
+            title="Выбрать папки"
             type="button"
-            variant="outline"
+            variant="default"
             onClick={chooseFolder}
           >
             <FolderPlus />
@@ -1122,148 +1177,144 @@ function App() {
       </Dialog>
 
       <Panel className="tableWrap">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <Button disabled={running || rows.length === 0} onClick={() => toggleColumn("fixes")} size="sm" type="button" variant="ghost">
-                  Fixes
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button disabled={running || rows.length === 0} onClick={() => toggleColumn("preview")} size="sm" type="button" variant="ghost">
-                  Preview
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button disabled={running || rows.length === 0} onClick={() => toggleColumn("telegram")} size="sm" type="button" variant="ghost">
-                  TG
-                </Button>
-              </TableHead>
-              <TableHead>Инфо</TableHead>
-              <TableHead>Файл</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell className="empty" colSpan={7}>
-                  Файлы не выбраны
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => {
-                const fixedPath = makeFixedPath(row.path);
-                const previewInput = row.fixes ? fixedPath : row.path;
-                const previewPath = makePreviewPath(previewInput);
-                const showsPreviewPath = row.preview || row.telegram;
-                const outputPath = row.fixes ? fixedPath : showsPreviewPath ? previewPath : "";
-                const displayPreviewPath = row.fixes && showsPreviewPath ? previewPath : "";
-                const fixedOutputExists = row.fixes && Boolean(pathExists[fixedPath]);
-                const previewOutputExists = row.preview && Boolean(pathExists[previewPath]);
-                const outputExists =
-                  (row.fixes && fixedOutputExists) || (!row.fixes && row.preview && previewOutputExists);
-                const displayPreviewExists = row.fixes && row.preview && previewOutputExists;
-                const missingPreviewForSend =
-                  row.telegram && !row.preview && showsPreviewPath && !pathExists[previewPath];
-                const statusLines = [
-                  row.fixes && { text: "Fixes", alert: fixedOutputExists },
-                  row.preview && { text: "Make Preview", alert: previewOutputExists },
-                  row.telegram && { text: "Send to TG", alert: false },
-                  missingPreviewForSend && { text: "нет __preview файла для отправки", alert: true },
-                  row.workflowStatus && { text: row.workflowStatus, alert: row.workflowStatus.includes("Ошибка") },
-                ].filter(Boolean) as Array<{ text: string; alert: boolean }>;
-                const outputLines = [
-                  { text: row.path, alert: false },
-                  outputPath && { text: outputPath, alert: outputExists },
-                  displayPreviewPath && { text: displayPreviewPath, alert: displayPreviewExists },
-                ].filter(Boolean) as Array<{ text: string; alert: boolean }>;
+        <div className="batchList">
+          {rows.length === 0 ? (
+            <div className="empty">Файлы не выбраны</div>
+          ) : (
+            rows.map((row) => {
+              const fixedPath = makeFixedPath(row.path);
+              const previewInput = row.fixes ? fixedPath : row.path;
+              const previewPath = makePreviewPath(previewInput);
+              const showsPreviewPath = row.preview || row.telegram;
+              const fixedOutputExists = row.fixes && Boolean(pathExists[fixedPath]);
+              const previewOutputExists = row.preview && Boolean(pathExists[previewPath]);
+              const missingPreviewForSend =
+                row.telegram && !row.preview && showsPreviewPath && !pathExists[previewPath];
+              const statusLines = [
+                row.fixes && { text: "Fixes", alert: fixedOutputExists },
+                row.preview && { text: "Make Preview", alert: previewOutputExists },
+                row.telegram && { text: "Send to TG", alert: false },
+                missingPreviewForSend && { text: "нет __preview файла для отправки", alert: true },
+                row.workflowStatus && { text: row.workflowStatus, alert: row.workflowStatus.includes("Ошибка") },
+              ].filter(Boolean) as Array<{ text: string; alert: boolean }>;
+              const pathLines = [
+                { label: "src", text: row.path, alert: false, active: true, tone: "source" },
+                { label: "fixes", text: fixedPath, alert: fixedOutputExists, active: row.fixes, tone: "fixes" },
+                {
+                  label: "preview",
+                  text: previewPath,
+                  alert: previewOutputExists || missingPreviewForSend,
+                  active: showsPreviewPath,
+                  tone: "preview",
+                },
+              ];
 
-                return (
-                  <TableRow className={row.fixes || row.preview || row.telegram ? "" : "inactive"} key={row.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={row.fixes}
-                        disabled={running}
-                        onCheckedChange={(checked) => updateRow(row.path, { fixes: checked === true })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox
-                        checked={row.preview}
-                        disabled={running}
-                        onCheckedChange={(checked) => updateRow(row.path, { preview: checked === true })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox
-                        checked={row.telegram}
-                        disabled={running}
-                        onCheckedChange={(checked) => updateRow(row.path, { telegram: checked === true })}
-                      />
-                    </TableCell>
-                    <TableCell className="meta">
-                      {row.metadataStatus === "loading"
-                        ? "..."
-                        : row.metadataStatus === "ready" && row.metadata
-                          ? `${row.metadata.resolution}\n${row.metadata.frames ?? "?"}F`
-                          : "-"}
-                    </TableCell>
-                    <TableCell className="path">
-                      {outputLines.map((line) => (
-                        <div className={line.alert ? "alert" : ""} key={line.text} title={line.text}>
+              return (
+                <Panel
+                  className={`videoItem ${row.fixes || row.preview || row.telegram ? "" : "inactive"}`}
+                  key={row.id}
+                >
+                  <div className="videoToggles">
+                    <RowToggle
+                      active={row.fixes}
+                      disabled={running}
+                      label="Fixes"
+                      tone="fixes"
+                      onClick={() => updateRow(row.path, { fixes: !row.fixes })}
+                    >
+                      <Wrench />
+                    </RowToggle>
+                    <RowToggle
+                      active={row.preview}
+                      disabled={running}
+                      label="Preview"
+                      tone="preview"
+                      onClick={() => updateRow(row.path, { preview: !row.preview })}
+                    >
+                      <Eye />
+                    </RowToggle>
+                    <RowToggle
+                      active={row.telegram}
+                      disabled={running}
+                      label="TG"
+                      tone="telegram"
+                      onClick={() => updateRow(row.path, { telegram: !row.telegram })}
+                    >
+                      <Send />
+                    </RowToggle>
+                  </div>
+
+                  <div className="videoThumb" title={fileName(row.path)}>
+                    <span>{baseName(row.path).slice(0, 2).toUpperCase()}</span>
+                  </div>
+
+                  <div className="pathStack">
+                    {pathLines.map((line) => (
+                      <div className={`pathLine ${line.tone} ${line.active ? "" : "muted"}`} key={line.label}>
+                        <span className="pathLabel">{line.label}</span>
+                        <span className={line.alert ? "pathValue alert" : "pathValue"} title={line.text}>
                           {line.text}
-                        </div>
-                      ))}
-                    </TableCell>
-                    <TableCell className="status">
-                      {statusLines.map((line) => (
-                        <div className={line.alert ? "alert" : ""} key={line.text}>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="metaStack">
+                    <span>{row.metadataStatus === "ready" && row.metadata ? row.metadata.resolution : "..."}</span>
+                    <span>{options.convertTo25Fps ? "25 fps" : "src fps"}</span>
+                    <span>{row.metadataStatus === "ready" && row.metadata ? `${row.metadata.frames ?? "?"}F` : "..."}</span>
+                  </div>
+
+                  <div className="statusStack">
+                    {statusLines.length > 0 ? (
+                      statusLines.map((line) => (
+                        <span className={line.alert ? "alert" : ""} key={line.text}>
                           {line.text}
-                        </div>
-                      ))}
-                    </TableCell>
-                    <TableCell className="actions">
-                      <Button
-                        aria-label="Показать в папке"
-                        size="icon"
-                        title="Показать в папке"
-                        type="button"
-                        variant="outline"
-                        onClick={() => reveal(row.path)}
-                      >
-                        <FolderOpen />
-                      </Button>
-                      <Button
-                        aria-label="Открыть"
-                        size="icon"
-                        title="Открыть"
-                        type="button"
-                        variant="outline"
-                        onClick={() => openInSystem(row.path)}
-                      >
-                        <ExternalLink />
-                      </Button>
-                      <Button
-                        aria-label="Убрать из списка"
-                        disabled={running}
-                        size="icon"
-                        title="Убрать из списка"
-                        type="button"
-                        variant="outline"
-                        onClick={() => removeRow(row.path)}
-                      >
-                        <X />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                        </span>
+                      ))
+                    ) : (
+                      <span>Готов к запуску</span>
+                    )}
+                  </div>
+
+                  <div className="itemActions">
+                    <Button
+                      aria-label="Показать в папке"
+                      size="icon"
+                      title="Показать в папке"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => reveal(row.path)}
+                    >
+                      <FolderOpen />
+                    </Button>
+                    <Button
+                      aria-label="Открыть"
+                      size="icon"
+                      title="Открыть"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => openInSystem(row.path)}
+                    >
+                      <ExternalLink />
+                    </Button>
+                    <Button
+                      aria-label="Убрать из списка"
+                      disabled={running}
+                      size="icon"
+                      title="Убрать из списка"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => removeRow(row.path)}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </Panel>
+              );
+            })
+          )}
+        </div>
       </Panel>
 
       <Panel className="logCompact">

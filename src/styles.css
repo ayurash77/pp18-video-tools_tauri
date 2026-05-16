@@ -39,6 +39,7 @@
   --foreground: oklch(0.9 0.03 270);
   --card: oklch(0.3 0.02 270);
   --card-bright: color-mix(in oklch, var(--card), var(--muted-foreground) 12%);
+  --card-soft: color-mix(in oklch, var(--card), transparent 18%);
   --muted: oklch(0.28 0.02 270);
   --muted-foreground: oklch(0.65 0.04 275);
   --primary: oklch(0.7 0.035 275 / 0.8);
@@ -63,7 +64,7 @@
   --status-active-fg: oklch(0.78 0.2 255);
   --status-active-bg: oklch(0.35 0.12 255);
   --project-fg: oklch(0.85 0.11 76);
-  --shadow-panel: 0 8px 16px rgb(0 0 0 / 0.2);
+  --shadow-panel: 0 8px 16px rgb(0 0 0 / 0.18);
   --scrollbar-bg: oklch(0.225 0.014 265);
   --scrollbar-fg: oklch(0.29 0.02 265);
   --scrollbar-hover: oklch(0.35 0.02 265);
@@ -217,14 +218,14 @@ input:disabled {
 }
 
 .app {
-  background: linear-gradient(180deg, color-mix(in oklch, var(--background), var(--card) 40%), var(--background));
+  background: var(--background);
   display: grid;
-  gap: 10px;
-  grid-template-rows: 54px minmax(0, 1fr) 70px 24px;
+  gap: 8px;
+  grid-template-rows: 50px minmax(0, 1fr) 70px 24px;
   height: 100%;
   min-width: 980px;
   overflow: hidden;
-  padding: 12px 14px;
+  padding: 10px 14px;
 }
 
 .workflowBar,
@@ -242,20 +243,28 @@ input:disabled {
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .workflowControls,
 .workflowActions {
   align-items: center;
   display: flex;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
 }
 
 .workflowControls {
   flex: 1;
   overflow: hidden;
+}
+
+.toolbarDivider {
+  background: color-mix(in oklch, var(--border), transparent 45%);
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 22px;
+  width: 1px;
 }
 
 .workflowControls label {
@@ -391,6 +400,12 @@ input:disabled {
   border-color: color-mix(in oklch, var(--status-done-fg), transparent 50%);
 }
 
+.toolbarActive {
+  border-color: color-mix(in oklch, var(--ring), transparent 20%);
+  color: var(--secondary-foreground);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring), transparent 72%);
+}
+
 h1 {
   color: var(--foreground);
   font-size: 22px;
@@ -452,10 +467,238 @@ p {
 }
 
 .tableWrap {
-  background: var(--table);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.batchList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
   min-height: 0;
   min-width: 0;
   overflow: auto;
+  padding: 6px 1px 10px;
+}
+
+.videoItem {
+  align-items: stretch;
+  background: var(--card-soft);
+  border-color: color-mix(in oklch, var(--card-bright), transparent 25%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 24px 112px minmax(360px, 1fr) 160px minmax(126px, 150px) 102px;
+  min-height: 72px;
+  min-width: 920px;
+  overflow: hidden;
+  padding: 4px 8px 4px 4px;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    filter 150ms ease,
+    transform 150ms ease;
+}
+
+.videoItem:hover {
+  background: color-mix(in oklch, var(--card), var(--muted-foreground) 4%);
+  border-color: color-mix(in oklch, var(--card-bright), white 8%);
+}
+
+.videoItem.inactive {
+  opacity: 0.52;
+}
+
+.videoToggles {
+  align-items: center;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding-block: 4px;
+}
+
+.rowToggle {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  box-shadow: none;
+  color: color-mix(in oklch, var(--muted-foreground), transparent 35%);
+  display: inline-flex;
+  height: 18px;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  width: 18px;
+}
+
+.rowToggle:hover {
+  background: color-mix(in oklch, var(--accent), transparent 55%);
+}
+
+.rowToggle:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring), transparent 70%);
+}
+
+.rowToggle svg {
+  height: 13px;
+  width: 13px;
+}
+
+.rowToggle.fixes[aria-pressed="true"] {
+  color: oklch(0.72 0.26 153);
+}
+
+.rowToggle.preview[aria-pressed="true"] {
+  color: oklch(0.74 0.19 229);
+}
+
+.rowToggle.telegram[aria-pressed="true"] {
+  color: oklch(0.76 0.18 252);
+}
+
+.videoThumb {
+  align-self: stretch;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.08), transparent 45%),
+    radial-gradient(circle at 28% 22%, oklch(0.7 0.16 18 / 0.6), transparent 32%),
+    radial-gradient(circle at 78% 62%, oklch(0.66 0.2 250 / 0.45), transparent 36%),
+    color-mix(in oklch, var(--card), black 6%);
+  border: 1px solid color-mix(in oklch, var(--card-bright), white 6%);
+  border-radius: 6px;
+  display: grid;
+  min-height: 64px;
+  overflow: hidden;
+  place-items: center;
+}
+
+.videoThumb span {
+  align-items: center;
+  backdrop-filter: blur(8px);
+  background: rgb(0 0 0 / 0.28);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 999px;
+  color: color-mix(in oklch, var(--foreground), transparent 8%);
+  display: inline-flex;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.pathStack {
+  align-self: center;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pathLine {
+  align-items: baseline;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 46px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.pathLine.muted {
+  opacity: 0.32;
+}
+
+.pathLabel {
+  align-items: center;
+  display: inline-flex;
+  font-family: "Titillium", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 4px;
+  line-height: 18px;
+}
+
+.pathLabel::before {
+  background: currentColor;
+  border-radius: 999px;
+  content: "";
+  display: inline-block;
+  height: 6px;
+  width: 6px;
+}
+
+.pathLine.source .pathLabel {
+  color: color-mix(in oklch, var(--muted-foreground), white 8%);
+}
+
+.pathLine.fixes .pathLabel,
+.pathLine.fixes .pathValue {
+  color: oklch(0.72 0.26 153);
+}
+
+.pathLine.preview .pathLabel,
+.pathLine.preview .pathValue {
+  color: oklch(0.74 0.19 229);
+}
+
+.pathValue {
+  color: color-mix(in oklch, var(--foreground), transparent 8%);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 18px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaStack,
+.statusStack {
+  align-self: center;
+  color: color-mix(in oklch, var(--muted-foreground), white 8%);
+  display: grid;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  gap: 2px;
+  line-height: 18px;
+  min-width: 0;
+}
+
+.metaStack {
+  grid-template-columns: 1.2fr 0.75fr 0.5fr;
+  text-align: right;
+}
+
+.metaStack span,
+.statusStack span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusStack {
+  color: color-mix(in oklch, var(--project-fg), white 4%);
+  font-family: "Titillium", sans-serif;
+  font-weight: 700;
+  text-align: right;
+}
+
+.alert {
+  color: var(--warning-fg) !important;
+}
+
+.itemActions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 table {
