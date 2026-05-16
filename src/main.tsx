@@ -3,24 +3,18 @@ import { createRoot } from "react-dom/client";
 import { open } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
-  BugOff,
-  ExternalLink,
-  Eye,
   Filter,
   FolderOpen,
   FolderPlus,
   List,
   Play,
   RotateCw,
-  Send,
   Settings,
   Square,
-  Trash2,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Checkbox } from "./components/ui/checkbox";
@@ -36,6 +30,7 @@ import {
 import { Input } from "./components/ui/input";
 import { Panel } from "./components/ui/panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
+import { VideoTaskCard, type VideoTaskLine } from "./components/VideoTaskCard";
 import "./styles.css";
 
 type VideoMetadata = {
@@ -424,31 +419,6 @@ function statusFromEvent(event: WorkflowEvent): string | undefined {
     if (event.status === "skipped") return "TG пропущен";
   }
   return undefined;
-}
-
-type RowToggleProps = {
-  active: boolean;
-  disabled?: boolean;
-  label: string;
-  onClick: () => void;
-  tone: "fixes" | "preview" | "telegram";
-  children: React.ReactNode;
-};
-
-function RowToggle({ active, disabled, label, onClick, tone, children }: RowToggleProps) {
-  return (
-    <button
-      aria-label={label}
-      aria-pressed={active}
-      className={`rowToggle ${tone}`}
-      disabled={disabled}
-      title={label}
-      type="button"
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
 }
 
 function App() {
@@ -1032,7 +1002,8 @@ function App() {
             className={telegramSettings?.hasBotToken && telegramSettings.hasChatId ? "telegramReady" : ""}
             disabled={running}
             type="button"
-            variant="outline"
+            size={"icon"}
+            variant="ghost"
             onClick={() => setTelegramOpen(true)}
           >
             <Settings />
@@ -1288,7 +1259,7 @@ function App() {
                 row.telegram && !row.preview && showsPreviewPath && !pathExists[previewPath];
               const thumbPath = previewPathExists ? previewPath : row.path;
               const thumbnailPath = thumbnailByPath[thumbPath];
-              const pathLines = [
+              const pathLines: VideoTaskLine[] = [
                 {
                   label: "src",
                   text: row.path,
@@ -1316,93 +1287,21 @@ function App() {
               ];
 
               return (
-                <Panel
-                  className={`videoItem ${row.fixes || row.preview || row.telegram ? "" : "inactive"}`}
+                <VideoTaskCard
+                  active={row.fixes || row.preview || row.telegram}
+                  disabled={running}
+                  fileLabel={baseName(row.path)}
                   key={row.id}
-                >
-                  <div className="videoToggles">
-                    <RowToggle
-                      active={row.fixes}
-                      disabled={running}
-                      label="Fixes"
-                      tone="fixes"
-                      onClick={() => updateRow(row.path, { fixes: !row.fixes })}
-                    >
-                      <BugOff />
-                    </RowToggle>
-                    <RowToggle
-                      active={row.preview}
-                      disabled={running}
-                      label="Preview"
-                      tone="preview"
-                      onClick={() => updateRow(row.path, { preview: !row.preview })}
-                    >
-                      <Eye />
-                    </RowToggle>
-                    <RowToggle
-                      active={row.telegram}
-                      disabled={running}
-                      label="TG"
-                      tone="telegram"
-                      onClick={() => updateRow(row.path, { telegram: !row.telegram })}
-                    >
-                      <Send />
-                    </RowToggle>
-                  </div>
-
-                  <div className={thumbnailPath ? "videoThumb hasImage" : "videoThumb"} title={fileName(thumbPath)}>
-                    {thumbnailPath ? <img alt="" src={convertFileSrc(thumbnailPath)} /> : null}
-                    <span>{thumbnailPath === undefined ? "..." : baseName(row.path).slice(0, 2).toUpperCase()}</span>
-                  </div>
-
-                  <div className="pathStack">
-                    {pathLines.map((line) => (
-                      <div className={`pathLine ${line.tone} ${line.active ? "" : "muted"}`} key={line.label}>
-                        <span className="pathLabel">{line.label}</span>
-                        <span className={line.alert ? "pathValue alert" : "pathValue"} title={line.text}>
-                          {line.text}
-                        </span>
-                        <span className="lineMeta">{line.meta[0]}</span>
-                        <span className="lineMeta">{line.meta[1]}</span>
-                        <span className="lineMeta">{line.meta[2]}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="itemActions">
-                    <Button
-                      aria-label="Показать в папке"
-                      size="icon"
-                      title="Показать в папке"
-                      type="button"
-                      variant="ghost"
-                      onClick={() => reveal(row.path)}
-                    >
-                      <FolderOpen />
-                    </Button>
-                    <Button
-                      aria-label="Открыть"
-                      size="icon"
-                      title="Открыть"
-                      type="button"
-                      variant="ghost"
-                      onClick={() => openInSystem(row.path)}
-                    >
-                      <ExternalLink />
-                    </Button>
-                    <Button
-                      aria-label="Убрать из списка"
-                      disabled={running}
-                      size="icon"
-                      title="Убрать из списка"
-                      type="button"
-                      variant="ghost"
-                      onClick={() => removeRow(row.path)}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-                </Panel>
+                  lines={pathLines}
+                  thumbnailSrc={thumbnailPath || undefined}
+                  toggles={{ fixes: row.fixes, preview: row.preview, telegram: row.telegram }}
+                  onOpen={() => openInSystem(row.path)}
+                  onRemove={() => removeRow(row.path)}
+                  onReveal={() => reveal(row.path)}
+                  onToggleFixes={() => updateRow(row.path, { fixes: !row.fixes })}
+                  onTogglePreview={() => updateRow(row.path, { preview: !row.preview })}
+                  onToggleTelegram={() => updateRow(row.path, { telegram: !row.telegram })}
+                />
               );
             })
           )}

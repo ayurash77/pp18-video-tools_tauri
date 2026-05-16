@@ -1,6 +1,7 @@
+use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -211,7 +212,7 @@ fn video_thumbnail(app: AppHandle, path: String) -> Result<String, String> {
     path.hash(&mut hasher);
     let output_path = cache_dir.join(format!("{:016x}.jpg", hasher.finish()));
     if output_path.is_file() {
-        return Ok(output_path.to_string_lossy().to_string());
+        return image_data_url(&output_path);
     }
 
     let output_string = output_path.to_string_lossy().to_string();
@@ -237,7 +238,20 @@ fn video_thumbnail(app: AppHandle, path: String) -> Result<String, String> {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
 
-    Ok(output_path.to_string_lossy().to_string())
+    image_data_url(&output_path)
+}
+
+fn image_data_url(path: &Path) -> Result<String, String> {
+    let bytes = fs::read(path).map_err(|error| {
+        format!(
+            "Не удалось прочитать thumbnail {}: {error}",
+            native_path(path)
+        )
+    })?;
+    Ok(format!(
+        "data:image/jpeg;base64,{}",
+        general_purpose::STANDARD.encode(bytes)
+    ))
 }
 
 #[tauri::command]

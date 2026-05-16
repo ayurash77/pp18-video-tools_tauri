@@ -118,7 +118,7 @@ body {
   background: var(--scrollbar-hover);
 }
 
-button:not(.ui-checkbox),
+button:not(.ui-checkbox):not(.video-icon-toggle),
 select {
   border: 1px solid color-mix(in oklch, var(--muted-foreground), transparent 80%);
   border-radius: 6px;
@@ -140,24 +140,24 @@ select {
     transform 150ms ease;
 }
 
-button:not(.ui-checkbox):hover,
+button:not(.ui-checkbox):not(.video-icon-toggle):hover,
 select:hover {
   background: var(--accent);
   color: var(--accent-foreground);
 }
 
-button:not(.ui-checkbox):active {
+button:not(.ui-checkbox):not(.video-icon-toggle):active {
   opacity: 0.72;
   transform: scale(0.98);
 }
 
-button:not(.ui-checkbox):focus-visible,
+button:not(.ui-checkbox):not(.video-icon-toggle):focus-visible,
 select:focus-visible {
   border-color: var(--ring);
   box-shadow: var(--focus-shadow);
 }
 
-button:not(.ui-checkbox):disabled,
+button:not(.ui-checkbox):not(.video-icon-toggle):disabled,
 select:disabled,
 input:disabled {
   cursor: not-allowed;
@@ -487,216 +487,8 @@ p {
   padding: 14px 14px 10px;
 }
 
-.videoItem {
-  align-items: stretch;
-  background: var(--card-soft);
-  border-color: color-mix(in oklch, var(--card-bright), transparent 25%);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 20px 212px minmax(560px, 1fr) 94px;
-  min-height: 128px;
-  min-width: 1080px;
-  overflow: hidden;
-  padding: 4px 8px 4px 4px;
-  transition:
-    background 150ms ease,
-    border-color 150ms ease,
-    filter 150ms ease,
-    transform 150ms ease;
-}
-
-.videoItem:hover {
-  background: color-mix(in oklch, var(--card), var(--muted-foreground) 4%);
-  border-color: color-mix(in oklch, var(--card-bright), white 8%);
-}
-
-.videoItem.inactive {
-  opacity: 0.52;
-}
-
-.videoToggles {
-  align-items: center;
-  display: grid;
-  gap: 8px;
-  justify-items: center;
-  padding-block: 24px;
-}
-
-.rowToggle {
-  align-items: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  box-shadow: none;
-  color: color-mix(in oklch, var(--muted-foreground), transparent 12%);
-  display: inline-flex;
-  height: 20px;
-  justify-content: center;
-  min-height: 0;
-  padding: 0;
-  width: 20px;
-}
-
-.rowToggle:hover {
-  background: color-mix(in oklch, var(--accent), transparent 55%);
-}
-
-.rowToggle:focus-visible {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring), transparent 70%);
-}
-
-.rowToggle svg {
-  height: 14px;
-  width: 14px;
-}
-
-.rowToggle.fixes[aria-pressed="true"],
-.rowToggle.fixes:hover {
-  color: oklch(0.72 0.26 153);
-}
-
-.rowToggle.preview[aria-pressed="true"],
-.rowToggle.preview:hover {
-  color: oklch(0.74 0.19 229);
-}
-
-.rowToggle.telegram[aria-pressed="true"],
-.rowToggle.telegram:hover {
-  color: oklch(0.76 0.18 252);
-}
-
-.videoThumb {
-  align-self: center;
-  background: color-mix(in oklch, var(--card), black 6%);
-  border: 1px solid color-mix(in oklch, var(--card-bright), white 6%);
-  border-radius: 6px;
-  display: grid;
-  height: 120px;
-  width: 212px;
-  overflow: hidden;
-  place-items: center;
-  position: relative;
-}
-
-.videoThumb img {
-  grid-area: 1 / 1;
-  height: 100%;
-  object-fit: cover;
-  width: 100%;
-}
-
-.videoThumb span {
-  align-items: center;
-  backdrop-filter: blur(8px);
-  background: rgb(0 0 0 / 0.28);
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 999px;
-  color: color-mix(in oklch, var(--foreground), transparent 8%);
-  display: inline-flex;
-  grid-area: 1 / 1;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 800;
-  height: 32px;
-  justify-content: center;
-  width: 32px;
-}
-
-.videoThumb.hasImage span {
-  display: none;
-}
-
-.pathStack {
-  align-self: center;
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.pathLine {
-  align-items: baseline;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 46px minmax(260px, 1fr) 92px 62px 54px;
-  min-width: 0;
-}
-
-.pathLine.muted {
-  opacity: 0.32;
-}
-
-.pathLabel {
-  align-items: center;
-  display: inline-flex;
-  font-family: "Titillium", sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  gap: 4px;
-  line-height: 18px;
-}
-
-.pathLabel::before {
-  background: currentColor;
-  border-radius: 999px;
-  content: "";
-  display: inline-block;
-  height: 6px;
-  width: 6px;
-}
-
-.pathLine.source .pathLabel {
-  color: color-mix(in oklch, var(--muted-foreground), white 8%);
-}
-
-.pathLine.fixes .pathLabel,
-.pathLine.fixes .pathValue {
-  color: oklch(0.72 0.26 153);
-}
-
-.pathLine.preview .pathLabel,
-.pathLine.preview .pathValue {
-  color: oklch(0.74 0.19 229);
-}
-
-.pathValue {
-  color: color-mix(in oklch, var(--foreground), transparent 8%);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 18px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lineMeta {
-  color: color-mix(in oklch, var(--muted-foreground), white 8%);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  line-height: 18px;
-  min-width: 0;
-  text-align: right;
-}
-
-.lineMeta {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .alert {
   color: var(--warning-fg) !important;
-}
-
-.itemActions {
-  align-items: center;
-  display: flex;
-  gap: 4px;
-  justify-content: flex-end;
-  min-width: 0;
 }
 
 table {
