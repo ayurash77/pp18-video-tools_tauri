@@ -2,10 +2,16 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default permissions for PP18 Video Tools",
-  "windows": ["main", "logs"],
+  "windows": ["main", "logs", "player"],
   "permissions": [
     "core:default",
     "core:webview:allow-create-webview-window",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-title",
+    "core:window:allow-show",
+    "core:window:allow-unminimize",
     "dialog:default",
     "process:default",
     "updater:default"

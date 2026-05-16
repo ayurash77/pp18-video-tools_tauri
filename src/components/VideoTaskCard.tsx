@@ -33,9 +33,12 @@ type VideoTaskCardProps = {
   onTogglePreview: () => void;
   onToggleTelegram: () => void;
   onRun: () => void;
+  onPlaySource: () => void;
+  onPlayFixed: () => void;
   onReveal: () => void;
   onOpen: () => void;
   onRemove: () => void;
+  fixedPlayable: boolean;
 };
 
 function IconToggle({
@@ -90,9 +93,12 @@ export function VideoTaskCard({
   onTogglePreview,
   onToggleTelegram,
   onRun,
+  onPlaySource,
+  onPlayFixed,
   onReveal,
   onOpen,
   onRemove,
+  fixedPlayable,
 }: VideoTaskCardProps) {
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
 
@@ -107,6 +113,7 @@ export function VideoTaskCard({
             contextMenuOpen && "border-ring ring ring-[color-mix(in_oklch,var(--ring),transparent_30%)] hover:border-ring",
             !active && "opacity-50",
           )}
+          onDoubleClick={onPlaySource}
         >
           <div className="grid items-center justify-items-center">
             <IconToggle active={toggles.fixes} disabled={disabled} label="Fixes" tone="fixes" onClick={onToggleFixes}>
@@ -175,9 +182,18 @@ export function VideoTaskCard({
         </section>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52">
+        <ContextMenuItem onSelect={onPlaySource}>
+          <Play className="size-4" />
+          Проиграть src
+        </ContextMenuItem>
+        <ContextMenuItem disabled={!fixedPlayable} onSelect={onPlayFixed}>
+          <Play className="size-4" />
+          Проиграть fix
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem disabled={disabled} onSelect={onRun}>
           <Play className="size-4" />
-          Запустить
+          Запустить задачу
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={onReveal}>

@@ -2,7 +2,7 @@
 
 Tauri + React desktop prototype for PP18 video workflows.
 
-Current release: `v0.1.7`.
+Current release: `v0.1.8`.
 
 ## Prerequisites
 
@@ -68,8 +68,9 @@ pnpm install
 - Stop/cancel for active ffmpeg workflows.
 - Auto-update support through Tauri updater and GitHub Releases.
 - Production Windows builds run without a console window.
-
-Thumbnails, built-in player, and full context menu parity are still pending.
+- Source-file thumbnails for task cards.
+- Built-in video player window with frame stepping, loop modes, and source/fix playback.
+- Context menu actions for per-card playback, running, reveal/open, and removal.
 
 ## Release and Updates
 
@@ -114,8 +115,8 @@ pushing a `v*` tag:
 pnpm install
 cargo check --manifest-path src-tauri/Cargo.toml
 pnpm build
-git tag v0.1.7
-git push origin main v0.1.7
+git tag v0.1.8
+git push origin main v0.1.8
 ```
 
 Version files:
@@ -137,14 +138,15 @@ requires an Apple Developer ID certificate and notarization.
 
 ## Current Release Notes
 
-`v0.1.7` is the latest release:
+`v0.1.8` is the latest release:
 
-- GitHub release: `https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.7`
-- Windows, macOS arm64, and macOS x64 release jobs passed.
-- Windows `show in folder` now treats successful Explorer launch as success.
-- Windows `open in system player` no longer uses `cmd /C start`.
-- Windows release builds hide the extra console window with `windows_subsystem = "windows"`.
-- Tauri CLI/Rust crate versions are aligned to avoid updater bundle type warnings.
+- GitHub release: `https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.8`
+- Added a separate built-in player window with frame stepping, loop modes, Esc close, and auto-sized startup.
+- `Проиграть src` uses an existing source `__preview` when available, otherwise opens the source.
+- Task-card thumbnails now always come from the source file.
+- Drag-and-drop adding now appends/deduplicates like the file/folder buttons.
+- Fixed action-line opacity rules and TG/preview coupling when preview files are missing.
+- Player/log windows close with the main window and use explicit Tauri window permissions.
 
 `v0.1.5` was an intermediate failed release attempt: macOS jobs completed, but
 the Windows job failed before `v0.1.6` fixed the compile issue.

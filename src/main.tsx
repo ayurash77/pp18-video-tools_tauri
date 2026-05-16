@@ -3,8 +3,8 @@ import { createRoot } from "react-dom/client";
 import { open } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
-import { invoke } from "@tauri-apps/api/core";
-import { listen, TauriEvent } from "@tauri-apps/api/event";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { emitTo, listen, TauriEvent } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
     BugOff,
@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { VideoTaskCard, type VideoTaskLine } from "./components/VideoTaskCard";
 import { FilterPopoverButton } from "./components/FilterPopoverButton";
 import { StatusFooter } from "./components/StatusFooter";
+import { VideoPreviewPlayer } from "./components/VideoPreviewPlayer";
 import { cn } from "./lib/utils";
 import "./styles.css";
 
@@ -105,6 +106,24 @@ type UpdateState =
   | { status: "installing"; update: Update; error: null; progress: string }
   | { status: "ready"; update: Update; error: null; progress: string }
   | { status: "error"; update: Update | null; error: string; progress: string };
+
+type PlayerState = {
+  fps: number | null;
+  label: string;
+  path: string;
+  videoHeight: number | null;
+  videoWidth: number | null;
+};
+
+const playerWindowHash = "#player";
+const playerWindowMinWidth = 520;
+const playerWindowMinHeight = 320;
+const playerWindowFallbackWidth = 960;
+const playerWindowFallbackHeight = 664;
+const playerWindowHorizontalPadding = 30;
+const playerWindowVerticalPaddingAndControls = 144;
+const playerWindowVerticalMinAutoWidth = 640;
+const playerWindowVerticalMaxHeight = 980;
 
 const videoExtensions = new Set([
   "3g2",
@@ -284,6 +303,44 @@ function metadataCells(metadata: VideoMetadata | undefined, available: boolean):
     return ["---", "---", "---"];
   }
   return [metadata.resolution || "---", formatFps(metadata.fps), metadata.frames ? `${metadata.frames}F` : "---"];
+}
+
+function parseResolution(resolution: string | undefined): { height: number; width: number } | null {
+  const match = resolution?.match(/^(\d+)x(\d+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? { width, height }
+    : null;
+}
+
+function playerWindowSize(videoSize: { height: number; width: number } | null) {
+  if (!videoSize) {
+    return { width: playerWindowFallbackWidth, height: playerWindowFallbackHeight };
+  }
+
+  const isVertical = videoSize.height > videoSize.width;
+  const maxWidth = Math.min(window.screen.availWidth * (isVertical ? 0.55 : 0.72), isVertical ? 820 : 1100);
+  const maxHeight = Math.min(
+    window.screen.availHeight * (isVertical ? 0.92 : 0.78),
+    isVertical ? playerWindowVerticalMaxHeight : 820,
+  );
+  const maxVideoWidth = Math.max(playerWindowMinWidth - playerWindowHorizontalPadding, maxWidth - playerWindowHorizontalPadding);
+  const maxVideoHeight = Math.max(
+    playerWindowMinHeight - playerWindowVerticalPaddingAndControls,
+    maxHeight - playerWindowVerticalPaddingAndControls,
+  );
+  const scale = Math.min(1, maxVideoWidth / videoSize.width, maxVideoHeight / videoSize.height);
+  const minAutoWidth = isVertical ? playerWindowVerticalMinAutoWidth : playerWindowMinWidth;
+
+  return {
+    width: Math.max(minAutoWidth, Math.round(videoSize.width * scale + playerWindowHorizontalPadding)),
+    height: Math.round(videoSize.height * scale + playerWindowVerticalPaddingAndControls),
+  };
 }
 
 function readStoredLog(): string[] {
@@ -467,6 +524,10 @@ function App() {
   const metadataBatchRef = useRef(0);
   const thumbnailBatchRef = useRef(0);
   const dropZoneRef = useRef<HTMLDivElement | null>(null);
+  const mainCloseInProgressRef = useRef(false);
+  const rowsRef = useRef<VideoRow[]>([]);
+  const sourcePathsRef = useRef<string[]>([]);
+  const optionsRef = useRef<ProcessingOptions>(options);
 
   const existenceKey = useMemo(
     () => rows.map((row) => `${row.path}|${row.fixes}|${row.preview}|${row.telegram}`).join("\n"),
@@ -475,13 +536,9 @@ function App() {
   const thumbnailSourceKey = useMemo(
     () =>
       rows
-        .map((row) => {
-          const fixedPath = makeFixedPath(row.path);
-          const previewPath = makePreviewPath(row.fixes ? fixedPath : row.path);
-          return pathExists[previewPath] ? previewPath : row.path;
-        })
+        .map((row) => row.path)
         .join("\n"),
-    [pathExists, rows],
+    [rows],
   );
 
   useEffect(() => {
@@ -493,7 +550,46 @@ function App() {
 
   useEffect(() => {
     saveProcessingOptions(options);
+    optionsRef.current = options;
   }, [options]);
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+
+  useEffect(() => {
+    sourcePathsRef.current = sourcePaths;
+  }, [sourcePaths]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    const currentWindow = WebviewWindow.getCurrent();
+    void currentWindow.onCloseRequested((event) => {
+      if (mainCloseInProgressRef.current) {
+        return;
+      }
+
+      mainCloseInProgressRef.current = true;
+      event.preventDefault();
+      void (async () => {
+        await closeAuxiliaryWindows();
+        await currentWindow.close();
+      })();
+    }).then((dispose) => {
+      if (cancelled) {
+        dispose();
+      } else {
+        unlisten = dispose;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -677,6 +773,19 @@ function App() {
     }
   }
 
+  async function closeAuxiliaryWindows() {
+    await Promise.all(
+      ["player", "logs"].map(async (label) => {
+        try {
+          const window = await WebviewWindow.getByLabel(label);
+          await window?.close();
+        } catch {
+          // Auxiliary windows are best-effort cleanup when the main window closes.
+        }
+      }),
+    );
+  }
+
   async function refreshPathExistence() {
     const paths = uniqueSorted(
       rows.flatMap((row) => {
@@ -704,9 +813,11 @@ function App() {
       currentRows.flatMap((row) => {
         const fixedPath = makeFixedPath(row.path);
         const previewPath = makePreviewPath(row.fixes ? fixedPath : row.path);
+        const sourcePreviewPath = makePreviewPath(row.path);
         return [
           row.path,
           existingPaths[fixedPath] ? fixedPath : null,
+          existingPaths[sourcePreviewPath] ? sourcePreviewPath : null,
           existingPaths[previewPath] ? previewPath : null,
         ].filter(Boolean) as string[];
       }),
@@ -886,7 +997,7 @@ function App() {
         unlisteners.pop()?.();
       }
     };
-  }, [running, sourcePaths, rows, options.latestVersionsOnly]);
+  }, [running]);
 
   function buildRows(paths: string[], latestVersionsOnly: boolean, currentRows = rows): VideoRow[] {
     const allVideos = uniqueInOrder(paths.filter(isVideoPath));
@@ -906,14 +1017,19 @@ function App() {
 
   function applyVideoPaths(paths: string[], logPrefix: string) {
     const incomingVideos = uniqueInOrder(paths.filter(isVideoPath));
-    const existingSources = new Set(sourcePaths);
+    const currentSourcePaths = sourcePathsRef.current;
+    const currentRows = rowsRef.current;
+    const currentOptions = optionsRef.current;
+    const existingSources = new Set(currentSourcePaths);
     const newVideos = incomingVideos.filter((path) => !existingSources.has(path));
     const duplicateCount = incomingVideos.length - newVideos.length;
-    const nextSourcePaths = uniqueInOrder([...sourcePaths, ...newVideos]);
-    const nextRows = buildRows(nextSourcePaths, options.latestVersionsOnly).map((row) =>
+    const nextSourcePaths = uniqueInOrder([...currentSourcePaths, ...newVideos]);
+    const nextRows = buildRows(nextSourcePaths, currentOptions.latestVersionsOnly, currentRows).map((row) =>
       !row.metadata && row.metadataStatus === "idle" ? { ...row, metadataStatus: "loading" as const } : row,
     );
 
+    sourcePathsRef.current = nextSourcePaths;
+    rowsRef.current = nextRows;
     setSourcePaths(nextSourcePaths);
     setRows(nextRows);
     setStatusText(nextRows.length ? `Всего файлов: ${nextRows.length}` : "Файлы не выбраны");
@@ -922,7 +1038,7 @@ function App() {
     const details = [
       `добавлено: ${newVideos.length}`,
       duplicateCount > 0 ? `пропущено дублей: ${duplicateCount}` : null,
-      options.latestVersionsOnly && hidden > 0 ? `скрыто старых версий: ${hidden}` : null,
+      currentOptions.latestVersionsOnly && hidden > 0 ? `скрыто старых версий: ${hidden}` : null,
     ].filter(Boolean);
 
     appendLog(
@@ -938,6 +1054,8 @@ function App() {
   }
 
   function clearVideoList() {
+    rowsRef.current = [];
+    sourcePathsRef.current = [];
     setRows([]);
     setSourcePaths([]);
     setPathExists({});
@@ -1183,7 +1301,15 @@ function App() {
     }
     const nextValue = rows.some((row) => !row[column]);
     setRows((current) =>
-      current.map((row) => ({ ...row, workflowStatus: undefined, [column]: nextValue })),
+      current.map((row) => {
+        const nextRow = { ...row, workflowStatus: undefined, [column]: nextValue };
+        if (column === "telegram" && nextValue) {
+          const fixedPath = makeFixedPath(row.path);
+          const previewPath = makePreviewPath(row.fixes ? fixedPath : row.path);
+          return pathExists[previewPath] ? nextRow : { ...nextRow, preview: true };
+        }
+        return nextRow;
+      }),
     );
   }
 
@@ -1228,6 +1354,55 @@ function App() {
       await invoke("open_in_system_player", { path });
     } catch (error) {
       appendLog(`Не удалось открыть файл: ${String(error)}`);
+    }
+  }
+
+  async function openEmbeddedPlayer(
+    path: string,
+    label: string,
+    fps?: number | null,
+    videoSize?: { height: number; width: number } | null,
+  ) {
+    const player: PlayerState = {
+      fps: fps ?? metadataByPath[path]?.fps ?? null,
+      label,
+      path,
+      videoHeight: videoSize?.height ?? null,
+      videoWidth: videoSize?.width ?? null,
+    };
+
+    try {
+      const existing = await WebviewWindow.getByLabel("player");
+      if (existing) {
+        await existing.close().catch(() => undefined);
+      }
+
+      const params = new URLSearchParams({
+        path: player.path,
+        label: player.label,
+      });
+      if (player.fps !== null) {
+        params.set("fps", String(player.fps));
+      }
+      if (player.videoWidth !== null && player.videoHeight !== null) {
+        params.set("width", String(player.videoWidth));
+        params.set("height", String(player.videoHeight));
+      }
+      const size = playerWindowSize(videoSize ?? null);
+
+      new WebviewWindow("player", {
+        title: `PP18 Video Tools - ${label}`,
+        url: `index.html${playerWindowHash}?${params.toString()}`,
+        width: size.width,
+        height: size.height,
+        minWidth: playerWindowMinWidth,
+        minHeight: playerWindowMinHeight,
+      });
+      window.setTimeout(() => {
+        void WebviewWindow.getByLabel("player").then((window) => window?.setFocus()).catch(() => undefined);
+      }, 120);
+    } catch (error) {
+      appendLog(`Не удалось открыть плеер: ${String(error)}`);
     }
   }
 
@@ -1415,7 +1590,7 @@ function App() {
           ) : (
             <Button disabled={rows.length === 0} type="button" variant={"destructive"} onClick={runSelectedActions}>
               <Play />
-              Запустить
+              Запустить задачи
             </Button>
           )}
         </div>
@@ -1587,15 +1762,14 @@ function App() {
           ) : (
             rows.map((row) => {
               const fixedPath = makeFixedPath(row.path);
+              const sourcePreviewPath = makePreviewPath(row.path);
               const previewInput = row.fixes ? fixedPath : row.path;
               const previewPath = makePreviewPath(previewInput);
               const showsPreviewPath = row.preview || row.telegram;
               const fixedPathExists = Boolean(pathExists[fixedPath]);
+              const sourcePreviewPathExists = Boolean(pathExists[sourcePreviewPath]);
               const previewPathExists = Boolean(pathExists[previewPath]);
-              const missingPreviewForSend =
-                row.telegram && !row.preview && showsPreviewPath && !pathExists[previewPath];
-              const thumbPath = previewPathExists ? previewPath : row.path;
-              const thumbnailPath = thumbnailByPath[thumbPath];
+              const thumbnailPath = thumbnailByPath[row.path];
               const pathLines: VideoTaskLine[] = [
                 {
                   label: "src",
@@ -1609,15 +1783,15 @@ function App() {
                   label: "fixes",
                   text: fixedPath,
                   alert: fixedPathExists,
-                  active: row.fixes || fixedPathExists,
+                  active: row.fixes,
                   tone: "fixes",
                   meta: metadataCells(metadataByPath[fixedPath], fixedPathExists),
                 },
                 {
                   label: "preview",
                   text: previewPath,
-                  alert: previewPathExists || missingPreviewForSend,
-                  active: showsPreviewPath || previewPathExists,
+                  alert: previewPathExists,
+                  active: row.preview,
                   tone: "preview",
                   meta: metadataCells(metadataByPath[previewPath], previewPathExists),
                 },
@@ -1628,17 +1802,46 @@ function App() {
                   active={row.fixes || row.preview || row.telegram}
                   disabled={running}
                   fileLabel={baseName(row.path)}
+                  fixedPlayable={fixedPathExists}
                   key={row.id}
                   lines={pathLines}
                   thumbnailSrc={thumbnailPath || undefined}
                   toggles={{ fixes: row.fixes, preview: row.preview, telegram: row.telegram }}
                   onOpen={() => openInSystem(row.path)}
+                  onPlayFixed={() =>
+                    openEmbeddedPlayer(
+                      fixedPath,
+                      `fix: ${fileName(fixedPath)}`,
+                      metadataByPath[fixedPath]?.fps,
+                      parseResolution(metadataByPath[fixedPath]?.resolution),
+                    )
+                  }
+                  onPlaySource={() => {
+                    const playablePath = sourcePreviewPathExists ? sourcePreviewPath : row.path;
+                    const playableMetadata = sourcePreviewPathExists ? metadataByPath[sourcePreviewPath] : row.metadata;
+                    openEmbeddedPlayer(
+                      playablePath,
+                      sourcePreviewPathExists ? `src preview: ${fileName(sourcePreviewPath)}` : `src: ${fileName(row.path)}`,
+                      playableMetadata?.fps,
+                      parseResolution(playableMetadata?.resolution),
+                    );
+                  }}
                   onRemove={() => removeRow(row.path)}
                   onReveal={() => reveal(row.path)}
                   onRun={() => runRow(row)}
                   onToggleFixes={() => updateRow(row.path, { fixes: !row.fixes })}
-                  onTogglePreview={() => updateRow(row.path, { preview: !row.preview })}
-                  onToggleTelegram={() => updateRow(row.path, { telegram: !row.telegram })}
+                  onTogglePreview={() =>
+                    updateRow(row.path, {
+                      preview: !row.preview,
+                      ...(row.preview && !previewPathExists ? { telegram: false } : {}),
+                    })
+                  }
+                  onToggleTelegram={() =>
+                    updateRow(row.path, {
+                      telegram: !row.telegram,
+                      ...(!row.telegram && !previewPathExists ? { preview: true } : {}),
+                    })
+                  }
                 />
               );
             })
@@ -1657,10 +1860,27 @@ function App() {
   );
 }
 
+function useCloseCurrentWindowOnEscape() {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      void WebviewWindow.getCurrent().close();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+}
+
 function LogWindow() {
   const [lines, setLines] = useState<string[]>(() => readStoredLog());
   const bodyRef = useRef<HTMLElement | null>(null);
   const autoScrollRef = useRef(true);
+  useCloseCurrentWindowOnEscape();
 
   function updateAutoScrollState(element: HTMLElement) {
     const distanceToBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
@@ -1709,9 +1929,77 @@ function LogWindow() {
   );
 }
 
+function parsePlayerStateFromLocation(): PlayerState | null {
+  const [, query = ""] = window.location.hash.split("?");
+  const params = new URLSearchParams(query);
+  const path = params.get("path");
+  if (!path) {
+    return null;
+  }
+
+  const fpsValue = params.get("fps");
+  const fps = fpsValue === null ? null : Number(fpsValue);
+  const widthValue = params.get("width");
+  const heightValue = params.get("height");
+  const width = widthValue === null ? null : Number(widthValue);
+  const height = heightValue === null ? null : Number(heightValue);
+  return {
+    fps: fps !== null && Number.isFinite(fps) && fps > 0 ? fps : null,
+    label: params.get("label") ?? fileName(path),
+    path,
+    videoHeight: height !== null && Number.isFinite(height) && height > 0 ? height : null,
+    videoWidth: width !== null && Number.isFinite(width) && width > 0 ? width : null,
+  };
+}
+
+function PlayerWindow() {
+  const [playerState, setPlayerState] = useState<PlayerState | null>(() => parsePlayerStateFromLocation());
+  useCloseCurrentWindowOnEscape();
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    void listen<PlayerState>("player-open", (event) => {
+      setPlayerState(event.payload);
+      void WebviewWindow.getCurrent().setTitle(`PP18 Video Tools - ${event.payload.label}`);
+    }).then((dispose) => {
+      if (cancelled) {
+        dispose();
+      } else {
+        unlisten = dispose;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
+  return (
+    <main className="grid h-full min-w-0 overflow-hidden bg-main p-4 text-main-text">
+      {playerState ? (
+        <VideoPreviewPlayer
+          className="min-h-0"
+          fps={playerState.fps}
+          infoLabel={playerState.label}
+          infoPath={playerState.path}
+          src={convertFileSrc(playerState.path)}
+        />
+      ) : (
+        <div className="empty">Файл не выбран</div>
+      )}
+    </main>
+  );
+}
+
 const isLogWindow = window.location.hash === "#logs";
-prepareSessionLog(isLogWindow);
+const isPlayerWindow = window.location.hash.startsWith(playerWindowHash);
+prepareSessionLog(isLogWindow || isPlayerWindow);
 
 createRoot(document.getElementById("root")!).render(
-  <AppErrorBoundary>{isLogWindow ? <LogWindow /> : <App />}</AppErrorBoundary>,
+  <AppErrorBoundary>
+    {isLogWindow ? <LogWindow /> : isPlayerWindow ? <PlayerWindow /> : <App />}
+  </AppErrorBoundary>,
 );
