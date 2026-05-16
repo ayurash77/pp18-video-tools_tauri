@@ -494,9 +494,9 @@ p {
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
   display: grid;
   gap: 10px;
-  grid-template-columns: 20px 108px minmax(560px, 1fr) minmax(112px, 150px) 94px;
-  min-height: 70px;
-  min-width: 920px;
+  grid-template-columns: 20px 212px minmax(560px, 1fr) 94px;
+  min-height: 128px;
+  min-width: 1080px;
   overflow: hidden;
   padding: 4px 8px 4px 4px;
   transition:
@@ -518,9 +518,9 @@ p {
 .videoToggles {
   align-items: center;
   display: grid;
-  gap: 4px;
+  gap: 8px;
   justify-items: center;
-  padding-block: 4px;
+  padding-block: 24px;
 }
 
 .rowToggle {
@@ -529,13 +529,13 @@ p {
   border: 1px solid transparent;
   border-radius: 5px;
   box-shadow: none;
-  color: color-mix(in oklch, var(--muted-foreground), transparent 42%);
+  color: color-mix(in oklch, var(--muted-foreground), transparent 12%);
   display: inline-flex;
-  height: 17px;
+  height: 20px;
   justify-content: center;
   min-height: 0;
   padding: 0;
-  width: 17px;
+  width: 20px;
 }
 
 .rowToggle:hover {
@@ -548,8 +548,8 @@ p {
 }
 
 .rowToggle svg {
-  height: 13px;
-  width: 13px;
+  height: 14px;
+  width: 14px;
 }
 
 .rowToggle.fixes[aria-pressed="true"],
@@ -568,18 +568,19 @@ p {
 }
 
 .videoThumb {
-  align-self: stretch;
+  align-self: center;
   background: color-mix(in oklch, var(--card), black 6%);
   border: 1px solid color-mix(in oklch, var(--card-bright), white 6%);
   border-radius: 6px;
   display: grid;
-  min-height: 62px;
+  height: 120px;
+  width: 212px;
   overflow: hidden;
   place-items: center;
   position: relative;
 }
 
-.videoThumb video {
+.videoThumb img {
   grid-area: 1 / 1;
   height: 100%;
   object-fit: cover;
@@ -593,13 +594,18 @@ p {
   border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 999px;
   color: color-mix(in oklch, var(--foreground), transparent 8%);
-  display: none;
+  display: inline-flex;
+  grid-area: 1 / 1;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   font-weight: 800;
   height: 32px;
   justify-content: center;
   width: 32px;
+}
+
+.videoThumb.hasImage span {
+  display: none;
 }
 
 .pathStack {
@@ -666,8 +672,7 @@ p {
   white-space: nowrap;
 }
 
-.lineMeta,
-.statusStack {
+.lineMeta {
   color: color-mix(in oklch, var(--muted-foreground), white 8%);
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
@@ -676,18 +681,10 @@ p {
   text-align: right;
 }
 
-.lineMeta,
-.statusStack span {
+.lineMeta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.statusStack {
-  color: color-mix(in oklch, var(--project-fg), white 4%);
-  font-family: "Titillium", sans-serif;
-  font-weight: 700;
-  text-align: right;
 }
 
 .alert {

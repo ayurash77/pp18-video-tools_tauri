@@ -457,6 +457,7 @@ function App() {
   const [log, setLog] = useState<string[]>(() => readStoredLog());
   const [pathExists, setPathExists] = useState<Record<string, boolean>>({});
   const [metadataByPath, setMetadataByPath] = useState<Record<string, VideoMetadata>>({});
+  const [thumbnailByPath, setThumbnailByPath] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<ProcessingOptions>(() => loadProcessingOptions());
   const [running, setRunning] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -468,10 +469,22 @@ function App() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>(idleUpdateState);
   const metadataBatchRef = useRef(0);
+  const thumbnailBatchRef = useRef(0);
 
   const existenceKey = useMemo(
     () => rows.map((row) => `${row.path}|${row.fixes}|${row.preview}|${row.telegram}`).join("\n"),
     [rows],
+  );
+  const thumbnailSourceKey = useMemo(
+    () =>
+      rows
+        .map((row) => {
+          const fixedPath = makeFixedPath(row.path);
+          const previewPath = makePreviewPath(row.fixes ? fixedPath : row.path);
+          return pathExists[previewPath] ? previewPath : row.path;
+        })
+        .join("\n"),
+    [pathExists, rows],
   );
 
   useEffect(() => {
@@ -532,6 +545,10 @@ function App() {
   useEffect(() => {
     void refreshPathExistence();
   }, [existenceKey]);
+
+  useEffect(() => {
+    queueThumbnailLoading(thumbnailSourceKey.split("\n").filter(Boolean));
+  }, [thumbnailSourceKey]);
 
   async function loadTelegramSettings() {
     try {
@@ -857,6 +874,50 @@ function App() {
         current.map((row) => (row.path === path ? { ...row, metadataStatus: "error" } : row)),
       );
       appendLog(`ffprobe: ${fileName(path)}: ${String(error)}`);
+    }
+  }
+
+  function queueThumbnailLoading(paths: string[]) {
+    const pending = uniqueSorted(paths.filter((path) => !thumbnailByPath[path]));
+    const batch = thumbnailBatchRef.current + 1;
+    thumbnailBatchRef.current = batch;
+    if (pending.length === 0) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      void loadThumbnailQueue(pending, batch);
+    }, 0);
+  }
+
+  async function loadThumbnailQueue(paths: string[], batch: number) {
+    const concurrency = Math.min(2, paths.length);
+    let index = 0;
+
+    await Promise.all(
+      Array.from({ length: concurrency }, async () => {
+        while (thumbnailBatchRef.current === batch && index < paths.length) {
+          const path = paths[index];
+          index += 1;
+          await loadThumbnail(path, batch);
+        }
+      }),
+    );
+  }
+
+  async function loadThumbnail(path: string, batch: number) {
+    try {
+      const thumbnail = await invoke<string>("video_thumbnail", { path });
+      if (thumbnailBatchRef.current !== batch) {
+        return;
+      }
+      setThumbnailByPath((current) => ({ ...current, [path]: thumbnail }));
+    } catch (error) {
+      if (thumbnailBatchRef.current !== batch) {
+        return;
+      }
+      setThumbnailByPath((current) => ({ ...current, [path]: "" }));
+      appendLog(`thumbnail: ${fileName(path)}: ${String(error)}`);
     }
   }
 
@@ -1226,13 +1287,7 @@ function App() {
               const missingPreviewForSend =
                 row.telegram && !row.preview && showsPreviewPath && !pathExists[previewPath];
               const thumbPath = previewPathExists ? previewPath : row.path;
-              const statusLines = [
-                row.fixes && { text: "Fixes", alert: fixedOutputExists },
-                row.preview && { text: "Make Preview", alert: previewOutputExists },
-                row.telegram && { text: "Send to TG", alert: false },
-                missingPreviewForSend && { text: "нет __preview файла для отправки", alert: true },
-                row.workflowStatus && { text: row.workflowStatus, alert: row.workflowStatus.includes("Ошибка") },
-              ].filter(Boolean) as Array<{ text: string; alert: boolean }>;
+              const thumbnailPath = thumbnailByPath[thumbPath];
               const pathLines = [
                 {
                   label: "src",
@@ -1295,9 +1350,9 @@ function App() {
                     </RowToggle>
                   </div>
 
-                  <div className="videoThumb" title={fileName(thumbPath)}>
-                    <video muted playsInline preload="metadata" src={`${convertFileSrc(thumbPath)}#t=0.1`} />
-                    <span>{baseName(row.path).slice(0, 2).toUpperCase()}</span>
+                  <div className={thumbnailPath ? "videoThumb hasImage" : "videoThumb"} title={fileName(thumbPath)}>
+                    {thumbnailPath ? <img alt="" src={convertFileSrc(thumbnailPath)} /> : null}
+                    <span>{thumbnailPath === undefined ? "..." : baseName(row.path).slice(0, 2).toUpperCase()}</span>
                   </div>
 
                   <div className="pathStack">
@@ -1312,18 +1367,6 @@ function App() {
                         <span className="lineMeta">{line.meta[2]}</span>
                       </div>
                     ))}
-                  </div>
-
-                  <div className="statusStack">
-                    {statusLines.length > 0 ? (
-                      statusLines.map((line) => (
-                        <span className={line.alert ? "alert" : ""} key={line.text}>
-                          {line.text}
-                        </span>
-                      ))
-                    ) : (
-                      <span>Готов к запуску</span>
-                    )}
                   </div>
 
                   <div className="itemActions">

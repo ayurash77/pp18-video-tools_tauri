@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::{
@@ -192,6 +194,50 @@ fn probe_video(app: AppHandle, path: String) -> Result<VideoMetadata, String> {
     }
 
     parse_metadata(&String::from_utf8_lossy(&output.stdout))
+}
+
+#[tauri::command]
+fn video_thumbnail(app: AppHandle, path: String) -> Result<String, String> {
+    let ffmpeg = find_tool(&app, "ffmpeg").ok_or_else(|| "ffmpeg не найден".to_string())?;
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|error| format!("Не удалось открыть cache dir: {error}"))?
+        .join("thumbs");
+    fs::create_dir_all(&cache_dir)
+        .map_err(|error| format!("Не удалось создать папку thumbnail cache: {error}"))?;
+
+    let mut hasher = DefaultHasher::new();
+    path.hash(&mut hasher);
+    let output_path = cache_dir.join(format!("{:016x}.jpg", hasher.finish()));
+    if output_path.is_file() {
+        return Ok(output_path.to_string_lossy().to_string());
+    }
+
+    let output_string = output_path.to_string_lossy().to_string();
+    let output = Command::new(ffmpeg)
+        .args([
+            "-y",
+            "-ss",
+            "00:00:01",
+            "-i",
+            &path,
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=424:240:force_original_aspect_ratio=increase,crop=424:240",
+            "-q:v",
+            "3",
+            &output_string,
+        ])
+        .output()
+        .map_err(|error| error.to_string())?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    Ok(output_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -1479,6 +1525,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             tool_status,
             probe_video,
+            video_thumbnail,
             telegram_settings,
             save_telegram_settings,
             path_existence,
