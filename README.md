@@ -2,7 +2,7 @@
 
 Tauri + React desktop prototype for PP18 video workflows.
 
-Current release: `v0.1.8`.
+Current release: `v0.1.9`.
 
 ## Prerequisites
 
@@ -115,8 +115,8 @@ pushing a `v*` tag:
 pnpm install
 cargo check --manifest-path src-tauri/Cargo.toml
 pnpm build
-git tag v0.1.8
-git push origin main v0.1.8
+git tag v0.1.9
+git push origin main v0.1.9
 ```
 
 Version files:
@@ -138,9 +138,10 @@ requires an Apple Developer ID certificate and notarization.
 
 ## Current Release Notes
 
-`v0.1.8` is the latest release:
+`v0.1.9` is the latest release:
 
-- GitHub release: `https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.8`
+- GitHub release: `https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.9`
+- Telegram captions now show the source filename plus full copyable Windows and MacOS paths.
 - Added a separate built-in player window with frame stepping, loop modes, Esc close, and auto-sized startup.
 - `Проиграть src` uses an existing source `__preview` when available, otherwise opens the source.
 - Task-card thumbnails now always come from the source file.

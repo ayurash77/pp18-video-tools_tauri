@@ -379,8 +379,8 @@ fn expand_dropped_paths(paths: Vec<String>) -> Result<Vec<String>, String> {
             })?;
 
             for entry in entries {
-                let entry =
-                    entry.map_err(|error| format!("Не удалось прочитать элемент папки: {error}"))?;
+                let entry = entry
+                    .map_err(|error| format!("Не удалось прочитать элемент папки: {error}"))?;
                 let file_type = entry
                     .file_type()
                     .map_err(|error| format!("Не удалось определить тип файла: {error}"))?;
@@ -1064,7 +1064,6 @@ fn send_telegram_video(
         "https://api.telegram.org/bot{}/sendVideo",
         settings.bot_token
     );
-    let reply_markup = telegram_reply_markup(original_path)?;
     let video_part = reqwest::blocking::multipart::Part::file(file)
         .map_err(|error| format!("Telegram: не удалось открыть файл: {error}"))?
         .file_name(filename)
@@ -1075,7 +1074,6 @@ fn send_telegram_video(
         .text("parse_mode", "HTML")
         .text("caption", make_caption_html(original_path))
         .text("supports_streaming", "true")
-        .text("reply_markup", reply_markup)
         .part("video", video_part);
 
     let response = reqwest::blocking::Client::new()
@@ -1102,18 +1100,25 @@ fn send_telegram_video(
 }
 
 fn make_caption_html(input: &str) -> String {
-    format!("<code>{}</code>", escape_html(&short_display_path(input)))
+    let (mac_path, windows_path) = telegram_copy_paths(input);
+    let title = file_stem_for_caption(input);
+    format!(
+        "<b>{}</b>\n\n⊞ Windows\n<pre>{}</pre>\n MacOS\n<pre>{}</pre>",
+        escape_html(&title),
+        escape_html(&windows_path),
+        escape_html(&mac_path)
+    )
 }
 
-fn telegram_reply_markup(input: &str) -> Result<String, String> {
-    let (mac_path, windows_path) = telegram_copy_paths(input);
-    let reply_markup = serde_json::json!({
-        "inline_keyboard": [[
-            { "text": "MacOS path", "copy_text": { "text": mac_path } },
-            { "text": "Win path", "copy_text": { "text": windows_path } }
-        ]]
-    });
-    serde_json::to_string(&reply_markup).map_err(|error| error.to_string())
+fn file_stem_for_caption(input: &str) -> String {
+    let normalized = native_path(input).replace('\\', "/");
+    let filename = normalized.rsplit('/').next().unwrap_or(&normalized);
+    filename
+        .rsplit_once('.')
+        .map(|(stem, _)| stem)
+        .filter(|stem| !stem.is_empty())
+        .unwrap_or(filename)
+        .to_string()
 }
 
 fn telegram_copy_paths(input: &str) -> (String, String) {
@@ -1126,32 +1131,6 @@ fn telegram_copy_paths(input: &str) -> (String, String) {
     }
 
     (path.clone(), path)
-}
-
-fn short_display_path(file_path: &str) -> String {
-    let path = Path::new(file_path);
-    let Some(parent) = path.parent() else {
-        return format!("/{}", native_path(file_path));
-    };
-    let Some(two_levels_up) = parent.parent() else {
-        return format!(
-            "/{}",
-            path.file_name().unwrap_or_default().to_string_lossy()
-        );
-    };
-    let root_name = two_levels_up
-        .file_name()
-        .map(|value| value.to_string_lossy())
-        .unwrap_or_default();
-    let relative = path
-        .strip_prefix(two_levels_up)
-        .unwrap_or(path)
-        .to_string_lossy();
-    if root_name.is_empty() {
-        format!("/{relative}")
-    } else {
-        format!("/{root_name}/{relative}")
-    }
 }
 
 fn mac_work_path_rest(path: &str) -> Option<String> {
@@ -1244,6 +1223,16 @@ mod tests {
 
         assert_eq!(mac_path, r"D:\media\file.mov");
         assert_eq!(windows_path, r"D:\media\file.mov");
+    }
+
+    #[test]
+    fn telegram_caption_uses_full_copyable_paths() {
+        let caption = make_caption_html("/Volumes/work/2026-2/Vyazanka/out/VYAZ_040_v00.mov");
+
+        assert_eq!(
+            caption,
+            "<b>VYAZ_040_v00</b>\n\n⊞ Windows\n<pre>w:\\2026-2\\Vyazanka\\out\\VYAZ_040_v00.mov</pre>\n MacOS\n<pre>/Volumes/work/2026-2/Vyazanka/out/VYAZ_040_v00.mov</pre>"
+        );
     }
 }
 

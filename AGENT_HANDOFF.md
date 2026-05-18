@@ -35,7 +35,7 @@ Current branch/tag state when this file was updated:
 ```text
 main
 HEAD 7deb7d5 Fix Windows release build
-latest release v0.1.8
+latest release v0.1.9
 ```
 
 `v0.1.5` exists as an intermediate failed release attempt. Do not use it as the
@@ -304,8 +304,8 @@ Apple notarization secrets.
 Release workflow trigger:
 
 ```bash
-git tag v0.1.8
-git push origin main v0.1.8
+git tag v0.1.9
+git push origin main v0.1.9
 ```
 
 Version must be bumped consistently in:
@@ -328,8 +328,8 @@ https://github.com/ayurash77/pp18-video-tools_tauri/releases/latest/download/lat
 Latest release at handoff time:
 
 ```text
-v0.1.8
-https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.8
+v0.1.9
+https://github.com/ayurash77/pp18-video-tools_tauri/releases/tag/v0.1.9
 ```
 
 Assets in `v0.1.6` include:
